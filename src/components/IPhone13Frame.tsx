@@ -208,7 +208,7 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
 
       {/* Main iPhone 13 Mockup Chassis Container */}
       <div
-        className="transition-transform duration-200 ease-out origin-top sm:my-auto"
+        className="transition-transform duration-200 ease-out origin-top sm:my-auto w-full sm:w-auto max-sm:!transform-none"
         style={{
           transform: `scale(${scale})`,
         }}
