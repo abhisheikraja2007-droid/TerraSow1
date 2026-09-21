@@ -38,9 +38,9 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
     <>
       <header
         id="top-app-bar"
-        className="w-full top-0 sticky z-40 bg-white border-b-2 border-[#0A0A0A] h-[56px] px-3.5 flex items-center justify-between shadow-xs select-none shrink-0"
+        className="w-full top-0 sticky z-40 bg-white border-b-2 border-[#0A0A0A] min-h-[56px] h-auto pt-[max(env(safe-area-inset-top),0px)] pb-1 px-3.5 flex items-center justify-between shadow-xs select-none shrink-0"
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 mt-1">
           <button
             id="btn-menu-toggle"
             aria-label="Menu"

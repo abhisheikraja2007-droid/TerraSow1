@@ -111,7 +111,7 @@ export default function App() {
 
   return (
     <IPhone13Frame>
-      <div className="flex-1 w-full flex flex-col justify-between relative bg-[#f7f9ff] text-[#181c20] font-['Atkinson_Hyperlegible'] min-h-full selection:bg-[#1b4332] selection:text-white">
+      <div className="flex-1 w-full h-full flex flex-col justify-between relative bg-[#f7f9ff] text-[#181c20] font-['Atkinson_Hyperlegible'] min-h-full selection:bg-[#1b4332] selection:text-white overflow-hidden">
         {/* Top App Bar Header */}
         <TopAppBar
           onOpenMenu={() => setIsMenuOpen(true)}
@@ -123,7 +123,7 @@ export default function App() {
         <PWAInstallBanner />
 
         {/* Main Scrollable View Area */}
-        <main className="flex-1 w-full px-2.5 py-3 overflow-y-auto">
+        <main className="flex-1 w-full px-2.5 py-3 overflow-y-auto overflow-x-hidden overscroll-contain">
           {activeTab === 'control' && (
             <EquipmentControlView
               equipmentState={equipmentState}

@@ -119,7 +119,7 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#0c1219] via-[#121c24] to-[#070b0e] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 md:p-6 overflow-x-hidden select-none">
+    <div className="min-h-[100dvh] sm:min-h-screen w-full bg-gradient-to-br from-[#0c1219] via-[#121c24] to-[#070b0e] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden sm:overflow-x-hidden select-none">
       {/* Top Desktop Frame Controls Floating Toolbar */}
       <div className="hidden sm:flex items-center justify-between w-full max-w-xl mb-3 px-4 py-2 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 text-white shadow-xl z-50 text-xs">
         <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
       >
         <div
           id="iphone-13-chassis"
-          className={`relative w-full sm:w-[414px] h-screen sm:h-[870px] ${currentColor.bodyBg} sm:p-[12px] sm:rounded-[54px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1),0_0_40px_rgba(45,106,79,0.15)] flex flex-col items-center justify-between border-0 sm:border-2 ${currentColor.outerBorder}`}
+          className={`relative w-full sm:w-[414px] h-[100dvh] sm:h-[870px] ${currentColor.bodyBg} sm:p-[12px] sm:rounded-[54px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1),0_0_40px_rgba(45,106,79,0.15)] flex flex-col items-center justify-between border-0 sm:border-2 ${currentColor.outerBorder}`}
         >
           {/* Hardware Hardware Left Buttons (Silent switch, Vol+, Vol-) */}
           <div className="hidden sm:block absolute -left-[7px] top-[115px] w-[5px] h-[26px] bg-[#22252a] rounded-l-md border border-white/10" />
@@ -233,10 +233,7 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
             {/* Application Scrollable Body Area */}
             <div
               id="iphone-13-app-viewport"
-              className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden flex flex-col relative bg-[#f7f9ff]"
-              style={{
-                WebkitOverflowScrolling: 'touch',
-              }}
+              className="flex-1 w-full h-full flex flex-col relative bg-[#f7f9ff] overflow-hidden"
             >
               {children}
             </div>
