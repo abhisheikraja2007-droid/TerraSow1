@@ -1,0 +1,6 @@
+{
+  "name": "AgriControl Pro",
+  "description": "Smart precision agriculture equipment control, Mission Planner & ArduPilot MAVLink API integration, live sowing telemetry dashboard, 35-crop calibration profile selector, and field operation history.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
