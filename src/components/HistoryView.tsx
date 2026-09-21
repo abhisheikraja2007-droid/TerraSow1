@@ -57,7 +57,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col gap-4 animate-fadeIn pb-8">
+    <div className="w-full max-w-md mx-auto flex flex-col gap-4 animate-fadeIn pb-6">
       {/* Top Header Section */}
       <div className="flex justify-between items-center border-b-2 border-gray-200 pb-3">
         <div>

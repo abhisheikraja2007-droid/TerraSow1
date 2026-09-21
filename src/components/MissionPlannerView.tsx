@@ -424,7 +424,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 pb-8 max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto flex flex-col gap-4 animate-fadeIn pb-6">
       {/* Toast Notification */}
       {notificationMsg && (
         <div className="bg-[#012d1d] text-white p-3 rounded-xl border-2 border-[#4ade80] flex items-center justify-between shadow-lg text-xs font-bold animate-fadeIn">

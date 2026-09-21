@@ -32,7 +32,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   return (
     <nav
       id="bottom-nav-bar"
-      className="sticky bottom-0 left-0 w-full z-40 bg-white border-t-[3px] border-[#0A0A0A] h-[64px] px-1 flex justify-around items-center shadow-[0_-4px_16px_rgba(0,0,0,0.08)] select-none shrink-0"
+      className="sticky bottom-0 left-0 w-full z-40 bg-white border-t-[3px] border-[#0A0A0A] h-[64px] px-1.5 grid grid-cols-5 gap-1 items-center shadow-[0_-4px_16px_rgba(0,0,0,0.08)] select-none shrink-0"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -43,7 +43,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             key={tab.id}
             id={`nav-btn-${tab.id}`}
             onClick={() => handleTabClick(tab.id)}
-            className={`relative flex flex-col items-center justify-center flex-1 h-[52px] mx-0.5 rounded-xl transition-all duration-150 cursor-pointer active:scale-95 ${
+            className={`relative flex flex-col items-center justify-center w-full h-[52px] rounded-xl transition-all duration-150 cursor-pointer active:scale-95 ${
               isActive
                 ? 'bg-[#012d1d] text-white shadow-sm font-black'
                 : 'text-gray-600 hover:text-black hover:bg-gray-100'
@@ -54,9 +54,9 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
               <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-[#4ade80] animate-ping" />
             )}
 
-            <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.5] text-[#4ade80]' : 'stroke-2'}`} />
+            <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'stroke-[2.5] text-[#4ade80]' : 'stroke-2'}`} />
             <span
-              className={`text-[9.5px] mt-0.5 font-['Public_Sans'] tracking-tight truncate ${
+              className={`text-[9.5px] mt-0.5 font-['Public_Sans'] tracking-tight truncate w-full text-center px-0.5 ${
                 isActive ? 'font-black uppercase text-white' : 'font-bold'
               }`}
             >
