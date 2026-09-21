@@ -30,16 +30,10 @@ interface MissionPlannerMapProps {
   activeWpIndex?: number;
   swathWidthMeters: number;
   mapType?: 'satellite_map' | 'hud_grid';
+  onUpdateTelemetry?: React.Dispatch<React.SetStateAction<VehicleTelemetry>>;
 }
 
 type MapLayerType = 'satellite' | 'dark' | 'osm' | 'terrain';
-
-const FARM_PRESETS = [
-  { name: 'Punjab Farm North (Wheat/Paddy)', lat: 31.5204, lng: 75.9064, zoom: 17 },
-  { name: 'Iowa Corn Belt (Maize/Soy)', lat: 41.878, lng: -93.0977, zoom: 17 },
-  { name: 'California Central Valley (Cotton/Almond)', lat: 36.7783, lng: -119.4179, zoom: 17 },
-  { name: 'Queensland Grain Belt (Sorghum)', lat: -27.5598, lng: 151.9507, zoom: 17 },
-];
 
 export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   waypoints,
@@ -48,6 +42,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   selectedCrop,
   activeWpIndex = 0,
   swathWidthMeters,
+  onUpdateTelemetry,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -65,7 +60,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
-  const [selectedFarmPreset, setSelectedFarmPreset] = useState(FARM_PRESETS[0].name);
+  const [isRoverEnabled, setIsRoverEnabled] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [locationToast, setLocationToast] = useState<string | null>(null);
@@ -74,12 +69,13 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    const initialLat = telemetry.lat || 31.5204;
-    const initialLng = telemetry.lng || 75.9064;
+    const initialLat = userLocation?.lat || 20.5937;
+    const initialLng = userLocation?.lng || 78.9629;
+    const initialZoom = userLocation ? 18 : 5;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
-      zoom: 18,
+      zoom: initialZoom,
       zoomControl: false,
       attributionControl: false,
     });
@@ -479,6 +475,14 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       iconAnchor: [22, 22],
     });
 
+    if (!isRoverEnabled) {
+      if (tractorMarkerRef.current) {
+        tractorMarkerRef.current.remove();
+        tractorMarkerRef.current = null;
+      }
+      return;
+    }
+
     if (!tractorMarkerRef.current) {
       tractorMarkerRef.current = L.marker([tractorLat, tractorLng], { icon: tractorIcon, zIndexOffset: 1000 }).addTo(map);
       tractorMarkerRef.current.bindPopup(`
@@ -496,17 +500,17 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       tractorMarkerRef.current.setLatLng([tractorLat, tractorLng]);
       tractorMarkerRef.current.setIcon(tractorIcon);
     }
-  }, [telemetry.lat, telemetry.lng, telemetry.headingDeg, telemetry.seederActive, telemetry.groundspeedKmh, telemetry.gpsFixType, telemetry.mode, telemetry.armed]);
+  }, [isRoverEnabled, telemetry.lat, telemetry.lng, telemetry.headingDeg, telemetry.seederActive, telemetry.groundspeedKmh, telemetry.gpsFixType, telemetry.mode, telemetry.armed]);
 
   // Center on Vehicle
   const handleCenterOnTractor = () => {
-    if (!mapInstanceRef.current) return;
+    if (!mapInstanceRef.current || !isRoverEnabled) return;
     playClickSound();
     hapticLight();
     mapInstanceRef.current.setView([telemetry.lat, telemetry.lng], 18, { animate: true });
   };
 
-  // Locate User Device GPS Position
+  // Locate User Device GPS Position & Enable Rover & Mapping
   const handleLocateUser = () => {
     if (!('geolocation' in navigator)) {
       setLocationToast('Geolocation is not supported by your browser.');
@@ -516,16 +520,44 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     playClickSound();
     hapticLight();
     setIsLocating(true);
-    setLocationToast('Requesting current GPS coordinates...');
+    setLocationToast('Acquiring live GPS coordinates...');
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
         setUserLocation({ lat: latitude, lng: longitude, accuracy });
+        setIsRoverEnabled(true);
         setIsLocating(false);
         playBeepSound(750, 0.12);
         hapticSuccess();
-        setLocationToast(`📍 Located at: ${latitude.toFixed(6)}°N, ${longitude.toFixed(6)}°E (±${accuracy.toFixed(1)}m)`);
+        setLocationToast(`📍 Located at: ${latitude.toFixed(6)}°N, ${longitude.toFixed(6)}°E (±${accuracy.toFixed(1)}m). AgriRover & mapping enabled!`);
+
+        // Update rover telemetry
+        if (onUpdateTelemetry) {
+          onUpdateTelemetry((prev) => ({
+            ...prev,
+            lat: latitude,
+            lng: longitude,
+            isConnected: true,
+            rtkAccuracyCm: Math.min(accuracy * 100, 2.5),
+            gpsFixType: 'RTK_FIXED',
+          }));
+        }
+
+        // Generate field grid mapping at user's location
+        const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
+        const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
+        const newGrid = generateFieldGrid(
+          selectedCrop.name,
+          swathWidthMeters,
+          latitude,
+          longitude,
+          150,
+          6,
+          targetDepth,
+          targetSpacing
+        );
+        onWaypointsChange(newGrid);
 
         if (mapInstanceRef.current) {
           const map = mapInstanceRef.current;
@@ -585,9 +617,9 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
         setIsLocating(false);
         let msg = 'Could not get current location.';
         if (err.code === err.PERMISSION_DENIED) {
-          msg = 'Location access was denied. Please allow GPS permission in your browser.';
+          msg = 'Location access was denied. Please allow GPS permission in your browser to enable mapping.';
         } else if (err.code === err.TIMEOUT) {
-          msg = 'Location request timed out. Retrying...';
+          msg = 'Location request timed out. Please retry.';
         }
         setLocationToast(msg);
       },
@@ -627,18 +659,8 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     playClickSound();
     hapticLight();
     const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng]));
-    bounds.extend([telemetry.lat, telemetry.lng]);
+    if (isRoverEnabled) bounds.extend([telemetry.lat, telemetry.lng]);
     mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], animate: true });
-  };
-
-  // Jump to Farm Preset
-  const handleSelectFarm = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = FARM_PRESETS.find((f) => f.name === e.target.value);
-    if (selected && mapInstanceRef.current) {
-      setSelectedFarmPreset(selected.name);
-      playClickSound();
-      mapInstanceRef.current.setView([selected.lat, selected.lng], selected.zoom, { animate: true });
-    }
   };
 
   // Clear Boundary or Measure
@@ -795,22 +817,6 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
           ))}
         </div>
 
-        {/* Global Preset Selector */}
-        <div className="flex items-center gap-1.5">
-          <Globe className="w-3.5 h-3.5 text-gray-300" />
-          <select
-            value={selectedFarmPreset}
-            onChange={handleSelectFarm}
-            className="bg-black/50 text-white border border-white/20 rounded-lg px-2 py-1 text-xs font-medium focus:outline-none focus:border-[#4ade80] cursor-pointer"
-          >
-            {FARM_PRESETS.map((farm) => (
-              <option key={farm.name} value={farm.name} className="bg-gray-900 text-white">
-                {farm.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Map Tool Modes */}
         <div className="flex items-center gap-1.5">
           <button
@@ -826,7 +832,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
             title="Click on the map to drop new Waypoints"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Click to Add WP</span>
+            <span>Add WP</span>
           </button>
 
           <button
@@ -836,13 +842,13 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
             }}
             className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
               mapMode === 'draw_boundary'
-                ? 'bg-sky-400 text-black border-sky-400 shadow-sm'
+                ? 'bg-[#4ade80] text-[#012d1d] border-[#4ade80] shadow-sm'
                 : 'bg-black/40 text-gray-200 border-white/20 hover:bg-white/10'
             }`}
-            title="Draw polygon vertices on satellite map to define field perimeter"
+            title="Draw field boundary to auto-fit grid"
           >
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Draw Polygon</span>
+            <Crosshair className="w-3.5 h-3.5" />
+            <span>Boundary</span>
           </button>
 
           <button
@@ -850,9 +856,9 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
               playClickSound();
               setMapMode(mapMode === 'measure' ? 'view' : 'measure');
             }}
-            className={`px-2 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 cursor-pointer transition-all ${
+            className={`p-1.5 rounded-lg border cursor-pointer transition-all ${
               mapMode === 'measure'
-                ? 'bg-rose-400 text-black border-rose-400 shadow-sm'
+                ? 'bg-[#4ade80] text-[#012d1d] border-[#4ade80]'
                 : 'bg-black/40 text-gray-200 border-white/20 hover:bg-white/10'
             }`}
             title="Measure distance between crop rows"
@@ -861,26 +867,27 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
           </button>
         </div>
 
-        {/* Quick View Controls */}
+        {/* Quick View & Locate Controls */}
         <div className="flex items-center gap-1">
           <button
             onClick={handleLocateUser}
-            className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+            disabled={isLocating}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs ${
               isLocating
                 ? 'bg-blue-600 text-white border-blue-400 animate-pulse'
-                : userLocation
-                ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-400'
-                : 'bg-black/40 hover:bg-white/10 text-white border-white/20'
+                : isRoverEnabled
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-400'
+                : 'bg-[#4ade80] hover:bg-[#38c86d] text-[#012d1d] border-black font-extrabold animate-pulse'
             }`}
-            title="Locate my physical device GPS position"
+            title="Locate my GPS position to enable AgriRover and field mapping"
           >
             {isLocating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <LocateFixed className="w-3.5 h-3.5 text-blue-300" />
+              <LocateFixed className="w-3.5 h-3.5" />
             )}
-            <span className="hidden sm:inline">
-              {isLocating ? 'Locating...' : userLocation ? 'My GPS Found' : 'Locate Me'}
+            <span>
+              {isLocating ? 'Locating...' : isRoverEnabled ? 'Re-Locate GPS' : 'Locate Me'}
             </span>
           </button>
 
@@ -897,7 +904,12 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
 
           <button
             onClick={handleCenterOnTractor}
-            className="p-1.5 bg-black/40 hover:bg-white/10 border border-white/20 rounded-lg text-white cursor-pointer"
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              isRoverEnabled
+                ? 'bg-black/40 hover:bg-white/10 text-white border-white/20'
+                : 'bg-black/20 text-gray-500 border-white/10 cursor-not-allowed'
+            }`}
+            disabled={!isRoverEnabled}
             title="Center on Tractor"
           >
             <Crosshair className="w-4 h-4 text-[#4ade80]" />
@@ -977,34 +989,81 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       >
         <div ref={mapContainerRef} className="w-full h-full z-10" />
 
+        {/* Unlocated Overlay: Prompts user to click Locate Me to enable mapping & rover */}
+        {!isRoverEnabled && (
+          <div className="absolute inset-0 z-20 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center select-none">
+            <div className="bg-[#012d1d] border-2 border-[#4ade80] rounded-2xl p-5 shadow-2xl max-w-[280px] sm:max-w-xs flex flex-col items-center gap-3 animate-fadeIn">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-[#4ade80] flex items-center justify-center text-[#4ade80]">
+                <LocateFixed className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white font-extrabold text-sm uppercase font-['Public_Sans']">
+                  Field Location Required
+                </h4>
+                <p className="text-gray-300 text-xs leading-relaxed">
+                  Tap <strong>Locate Me</strong> to acquire your real-time GPS coordinates and activate the AgriRover and sowing map.
+                </p>
+              </div>
+              <button
+                onClick={handleLocateUser}
+                disabled={isLocating}
+                className="w-full py-2.5 px-4 bg-[#4ade80] hover:bg-[#38c86d] text-[#012d1d] font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-95"
+              >
+                {isLocating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Acquiring GPS...</span>
+                  </>
+                ) : (
+                  <>
+                    <LocateFixed className="w-4 h-4" />
+                    <span>Locate Me & Enable Rover</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Map Legend Overlay */}
         <div className="absolute bottom-3 left-3 z-20 bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 text-[11px] text-white flex flex-wrap items-center gap-3 shadow-lg pointer-events-none select-none">
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-1.5 bg-[#4ade80] rounded-full inline-block" />
-            <span className="font-bold">Sowing Swath (Seeder ON)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-3 h-1.5 bg-amber-400 border-dashed border-t inline-block" />
-            <span className="font-bold">Headland Turn</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#012d1d] border border-[#4ade80] inline-block" />
-            <span className="font-bold">AgriRover</span>
-          </div>
+          {isRoverEnabled && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-1.5 bg-[#4ade80] rounded-full inline-block" />
+                <span className="font-bold">Sowing Swath</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-1.5 bg-amber-400 border-dashed border-t inline-block" />
+                <span className="font-bold">Headland Turn</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#012d1d] border border-[#4ade80] inline-block" />
+                <span className="font-bold">AgriRover</span>
+              </div>
+            </>
+          )}
           {userLocation && (
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 border border-white inline-block animate-ping" />
               <span className="font-bold text-blue-300">You ({userLocation.lat.toFixed(4)}°, {userLocation.lng.toFixed(4)}°)</span>
             </div>
           )}
+          {!isRoverEnabled && !userLocation && (
+            <div className="flex items-center gap-1.5 text-gray-400">
+              <span className="font-bold">GPS Standby • Tap Locate Me to Activate</span>
+            </div>
+          )}
         </div>
 
         {/* Live GPS Telemetry Overlay Chip */}
-        <div className="absolute top-3 right-3 z-20 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-[11px] font-mono text-white flex items-center gap-2 shadow-lg">
-          <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-ping" />
-          <span>{telemetry.lat.toFixed(6)}°N, {telemetry.lng.toFixed(6)}°E</span>
-          <span className="text-[#4ade80] font-bold">| {telemetry.gpsFixType}</span>
-        </div>
+        {isRoverEnabled && (
+          <div className="absolute top-3 right-3 z-20 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-[11px] font-mono text-white flex items-center gap-2 shadow-lg">
+            <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-ping" />
+            <span>{telemetry.lat.toFixed(6)}°N, {telemetry.lng.toFixed(6)}°E</span>
+            <span className="text-[#4ade80] font-bold">| {telemetry.gpsFixType}</span>
+          </div>
+        )}
       </div>
     </div>
   );

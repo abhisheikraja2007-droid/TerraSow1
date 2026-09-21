@@ -102,8 +102,8 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
 
   // Live Telemetry
   const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
-  const [activeWaypoints, setActiveWaypoints] = useState<Waypoint[]>(SAMPLE_WAYPOINTS);
-  const [activeWpIndex, setActiveWpIndex] = useState(2);
+  const [activeWaypoints, setActiveWaypoints] = useState<Waypoint[]>([]);
+  const [activeWpIndex, setActiveWpIndex] = useState(0);
   const [mapDisplayType, setMapDisplayType] = useState<'satellite_map' | 'hud_grid'>('satellite_map');
 
   // Grid Generator Controls
@@ -588,6 +588,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                 onWaypointsChange={setActiveWaypoints}
                 selectedCrop={selectedCrop}
                 telemetry={telemetry}
+                onUpdateTelemetry={setTelemetry}
                 swathWidthMeters={swathWidthMeters}
                 activeWpIndex={activeWpIndex}
                 mapType={mapDisplayType}
