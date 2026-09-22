@@ -106,8 +106,20 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
 
     mapInstanceRef.current = map;
 
-    // Click handler for Adding Waypoints or Drawing Boundary
-    map.on('click', (e: L.LeafletMouseEvent) => {
+
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // Map Click Handler for Map Modes (Add WP, Draw Boundary, Measure)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const onMapClick = (e: L.LeafletMouseEvent) => {
       const { lat, lng } = e.latlng;
 
       if (mapMode === 'add_waypoint') {
@@ -151,13 +163,14 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
           return updated;
         });
       }
-    });
+    };
+
+    map.on('click', onMapClick);
 
     return () => {
-      map.remove();
-      mapInstanceRef.current = null;
+      map.off('click', onMapClick);
     };
-  }, []);
+  }, [mapMode, selectedCrop]);
 
   // Update Tile Layer
   useEffect(() => {
