@@ -544,20 +544,8 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
           }));
         }
 
-        // Generate field grid mapping at user's location
-        const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
-        const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
-        const newGrid = generateFieldGrid(
-          selectedCrop.name,
-          swathWidthMeters,
-          latitude,
-          longitude,
-          150,
-          6,
-          targetDepth,
-          targetSpacing
-        );
-        onWaypointsChange(newGrid);
+        // We just locate the user. We no longer auto-generate the grid here,
+        // so the user can manually add their own waypoints.
 
         if (mapInstanceRef.current) {
           const map = mapInstanceRef.current;
