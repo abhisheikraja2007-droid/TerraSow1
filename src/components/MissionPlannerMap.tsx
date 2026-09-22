@@ -424,7 +424,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     // Check if the telemetry has moved away from the hardcoded Punjab default
     // This happens when MissionPlannerView automatically syncs the live device GPS
     if (telemetry.lat !== 31.5204 && telemetry.lng !== 75.9064) {
-      mapInstanceRef.current.setView([telemetry.lat, telemetry.lng], 18, { animate: true });
+      mapInstanceRef.current.setView([telemetry.lat, telemetry.lng], 17, { animate: true });
       hasAutoCenteredRef.current = true;
     }
   }, [telemetry.lat, telemetry.lng]);
@@ -585,7 +585,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
 
         if (mapInstanceRef.current) {
           const map = mapInstanceRef.current;
-          map.flyTo([latitude, longitude], 18, { duration: 1.5 });
+          map.flyTo([latitude, longitude], 17, { duration: 1.5 });
 
           // Draw / Update User Marker
           const userIcon = L.divIcon({
@@ -633,6 +633,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
               weight: 1.5,
               fillColor: '#60a5fa',
               fillOpacity: 0.15,
+              interactive: false,
             }).addTo(map);
           }
         }
