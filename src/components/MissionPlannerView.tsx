@@ -155,6 +155,17 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     };
   }, [activeWaypoints, swathWidthMeters]);
 
+  // Sync telemetry rover location with physical device GPS location
+  useEffect(() => {
+    if (userGeoLocation) {
+      setTelemetry((prev) => ({
+        ...prev,
+        lat: userGeoLocation.lat,
+        lng: userGeoLocation.lng,
+      }));
+    }
+  }, [userGeoLocation]);
+
   // Poll live telemetry from API
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -234,6 +245,34 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       seederActive: active,
       seederRpm: active ? 120 : 0,
     }));
+  };
+
+  const handleAiOptimizeGrid = () => {
+    playClickSound();
+    hapticSuccess();
+    
+    const rowSpacingCm = parseFloat(selectedCrop.rowSpacing) || 40;
+    
+    // 1. Calculate Swath Width:
+    // Target a standard AgriRover implement width of ~2.4 meters, find nearest multiple of row spacing.
+    const targetWidthCm = 240; 
+    const numDrills = Math.max(2, Math.round(targetWidthCm / rowSpacingCm));
+    const optimalSwathWidth = (numDrills * rowSpacingCm) / 100;
+    
+    // 2. Calculate Row Length & Count:
+    // Assuming a standard 1 acre (4046 sq meters) test plot.
+    const plotArea = 4046;
+    const optimalLength = Math.round(Math.sqrt(plotArea * 1.5) / 10) * 10; // approx 80m
+    const totalWidthNeeded = plotArea / optimalLength;
+    // Round to nearest even number of rows for optimal routing (return to start)
+    let optimalRows = Math.max(2, Math.round(totalWidthNeeded / optimalSwathWidth));
+    if (optimalRows % 2 !== 0) optimalRows += 1;
+
+    setSwathWidthMeters(Number(optimalSwathWidth.toFixed(1)));
+    setFieldRowsCount(optimalRows);
+    setFieldLengthMeters(optimalLength);
+    
+    showToast(`AI tuned for ${selectedCrop.name}: ${optimalSwathWidth.toFixed(1)}m swath, ${optimalRows} rows, ${optimalLength}m length (1 Acre).`);
   };
 
   const handleGenerateGrid = () => {
@@ -625,7 +664,14 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                   <Sliders className="w-4 h-4 text-[#2D6A4F]" />
                   <span>Field Grid Parameters</span>
                 </h4>
-                <span className="text-[10px] text-gray-500 font-bold uppercase">Grid Controls</span>
+                <button
+                  onClick={handleAiOptimizeGrid}
+                  className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200 rounded flex items-center gap-1 text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                  title="Auto-calculate optimal parameters for 1-Acre field based on selected crop's row spacing."
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>AI Optimize</span>
+                </button>
               </div>
 
               <div className="flex flex-col gap-3 text-xs">
