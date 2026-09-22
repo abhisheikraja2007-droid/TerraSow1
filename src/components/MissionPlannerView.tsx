@@ -75,6 +75,11 @@ interface MissionPlannerViewProps {
   equipmentState: EquipmentState;
   onUpdateEquipment: (updater: (prev: EquipmentState) => EquipmentState) => void;
   onNavigateToControl: () => void;
+  globalTelemetry: VehicleTelemetry;
+  setGlobalTelemetry: React.Dispatch<React.SetStateAction<VehicleTelemetry>>;
+  isConnected: boolean;
+  setIsConnected: React.Dispatch<React.SetStateAction<boolean>>;
+  telemetryHistory: [number, number][];
 }
 
 export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
@@ -82,6 +87,11 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   equipmentState,
   onUpdateEquipment,
   onNavigateToControl,
+  globalTelemetry,
+  setGlobalTelemetry,
+  isConnected,
+  setIsConnected,
+  telemetryHistory,
 }) => {
   // Active Mission Planner Tab
   const [activeTab, setActiveTab] = useState<MissionPlannerTab>('flight-plan');
@@ -97,13 +107,13 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     voiceAnnouncements: true,
   });
 
-  const [isConnected, setIsConnected] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [syncWithAppTelemetry, setSyncWithAppTelemetry] = useState(true);
   const wpTableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Live Telemetry
-  const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
+  // Live Telemetry from App.tsx
+  const telemetry = globalTelemetry;
+  const setTelemetry = setGlobalTelemetry;
   const [activeWaypoints, setActiveWaypoints] = useState<Waypoint[]>([]);
   const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
   const [activeWpIndex, setActiveWpIndex] = useState(0);
@@ -177,29 +187,8 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     }
   }, [userGeoLocation]);
 
-  // Poll live telemetry from API
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isConnected) {
-      interval = setInterval(async () => {
-        const data = await MissionPlannerService.getTelemetry();
-        if (data) {
-          setTelemetry(data);
-          if (syncWithAppTelemetry) {
-            onUpdateEquipment((prev) => ({
-              ...prev,
-              isRunning: data.armed && data.mode === 'AUTO',
-              speedKmh: data.groundspeedKmh,
-              gpsAccuracyCm: data.rtkAccuracyCm,
-              steeringAngleDeg: data.headingDeg % 30,
-              rtkStatus: data.gpsFixType === 'RTK_FIXED' ? 'FIXED' : 'FLOAT',
-            }));
-          }
-        }
-      }, config.pollIntervalMs || 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isConnected, syncWithAppTelemetry, onUpdateEquipment, config.pollIntervalMs]);
+  // Polling logic has been moved to App.tsx to ensure telemetry is always updated 
+  // globally across the app, even when Mission Planner is not in view.
 
   // Handlers
   const handleConnect = async () => {
@@ -668,6 +657,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                 boundaryPoints={boundaryPoints}
                 setBoundaryPoints={setBoundaryPoints}
                 onGenerateBoundaryGrid={handleGenerateGrid}
+                telemetryHistory={telemetryHistory}
               />
             </div>
 

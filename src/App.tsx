@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, CropProfile, EquipmentState, HistoryEntry } from './types';
+import { ActiveTab, CropProfile, EquipmentState, HistoryEntry, VehicleTelemetry } from './types';
+import { MissionPlannerService } from './services/missionPlannerApi';
 import { CROPS_DATA } from './data/cropsData';
 import { INITIAL_HISTORY } from './data/historyData';
 import { IPhone13Frame } from './components/IPhone13Frame';
@@ -49,6 +50,90 @@ export default function App() {
     isEmergencyStopped: false,
     rtkStatus: 'FIXED',
   });
+
+  // Global MAVLink Telemetry State
+  const [isConnected, setIsConnected] = useState(false);
+  const [telemetry, setTelemetry] = useState<VehicleTelemetry>({
+    lat: 30.900965,
+    lng: 75.857275,
+    alt: 245.5,
+    headingDeg: 90,
+    groundspeedKmh: 0,
+    armed: false,
+    mode: 'HOLD',
+    satellitesCount: 0,
+    gpsFixType: 'NO_FIX',
+    rtkAccuracyCm: 99.9,
+    batteryVoltage: 0,
+    batteryRemainingPct: 0,
+  });
+
+  const [telemetryHistory, setTelemetryHistory] = useState<[number, number][]>([]);
+
+  // Haversine distance formula (in meters)
+  const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Poll live telemetry from API globally
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isConnected) {
+      interval = setInterval(async () => {
+        const data = await MissionPlannerService.getTelemetry();
+        if (data) {
+          setTelemetry(data);
+          
+          // Update equipment state for UI components
+          setEquipmentState((prev) => ({
+            ...prev,
+            isRunning: data.armed && data.mode === 'AUTO',
+            speedKmh: data.groundspeedKmh,
+            gpsAccuracyCm: data.rtkAccuracyCm,
+            steeringAngleDeg: data.headingDeg % 30,
+            rtkStatus: data.gpsFixType === 'RTK_FIXED' ? 'FIXED' : 'FLOAT',
+            batteryPercent: data.batteryRemainingPct,
+          }));
+
+          // Track physical movement for Area Covered & Breadcrumbs
+          setTelemetryHistory((prev) => {
+            if (data.groundspeedKmh > 0.1) {
+              const lastPoint = prev[prev.length - 1];
+              if (!lastPoint) {
+                return [[data.lat, data.lng]];
+              }
+              const dist = getDistanceMeters(lastPoint[0], lastPoint[1], data.lat, data.lng);
+              if (dist >= 1.0) {
+                // Moved at least 1 meter, append point
+                const newHistory = [...prev, [data.lat, data.lng] as [number, number]];
+                
+                // Calculate new total area covered (acres) based on distance * swath width
+                const swathWidthMeters = 2.4; // 2.4m default implement width
+                const areaAddedSqM = dist * swathWidthMeters;
+                const areaAddedAcres = areaAddedSqM / 4046.86;
+                
+                setEquipmentState((ePrev) => ({
+                  ...ePrev,
+                  totalAreaCoveredAcres: Number((ePrev.totalAreaCoveredAcres + areaAddedAcres).toFixed(3))
+                }));
+
+                return newHistory;
+              }
+            }
+            return prev;
+          });
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isConnected]);
 
   // Real-time equipment simulation loop
   useEffect(() => {
@@ -156,6 +241,11 @@ export default function App() {
               equipmentState={equipmentState}
               onUpdateEquipment={setEquipmentState}
               onNavigateToControl={() => setActiveTab('control')}
+              globalTelemetry={telemetry}
+              setGlobalTelemetry={setTelemetry}
+              isConnected={isConnected}
+              setIsConnected={setIsConnected}
+              telemetryHistory={telemetryHistory}
             />
           )}
 

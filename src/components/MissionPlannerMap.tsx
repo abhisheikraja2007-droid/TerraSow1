@@ -34,6 +34,7 @@ interface MissionPlannerMapProps {
   boundaryPoints: [number, number][];
   setBoundaryPoints: React.Dispatch<React.SetStateAction<[number, number][]>>;
   onGenerateBoundaryGrid: () => void;
+  telemetryHistory: [number, number][];
 }
 
 type MapLayerType = 'satellite' | 'dark' | 'osm' | 'terrain';
@@ -49,6 +50,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   boundaryPoints,
   setBoundaryPoints,
   onGenerateBoundaryGrid,
+  telemetryHistory,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -104,8 +106,8 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     const breadcrumbs = L.polyline([], {
       color: '#4ade80',
       weight: 3,
-      opacity: 0.6,
-      dashArray: '2, 4',
+      opacity: 0.8,
+      dashArray: '5, 8',
     }).addTo(map);
     breadcrumbsRef.current = breadcrumbs;
 
@@ -118,6 +120,13 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Update Breadcrumbs Trail when telemetry history changes
+  useEffect(() => {
+    if (breadcrumbsRef.current) {
+      breadcrumbsRef.current.setLatLngs(telemetryHistory);
+    }
+  }, [telemetryHistory]);
 
   // Map Click Handler for Map Modes (Add WP, Draw Boundary, Measure)
   useEffect(() => {

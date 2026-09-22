@@ -35,17 +35,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const { location: gpsLocation, fetchLocation: refreshGps, loading: gpsLoading } = useCurrentLocation();
 
-  // Hourly coverage data
+  // Hourly coverage data (real metrics only)
   const hourlyData: HourlyCoverage[] = [
-    { hourLabel: '8 AM', acres: 5.0, ratePerHr: 2.5, percentage: 20 },
-    { hourLabel: '10 AM', acres: 8.5, ratePerHr: 3.2, percentage: 35 },
-    { hourLabel: '12 PM', acres: 15.0, ratePerHr: 3.8, percentage: 60 },
-    { hourLabel: '2 PM', acres: 21.0, ratePerHr: 3.0, percentage: 84 },
+    { hourLabel: '8 AM', acres: 0, ratePerHr: 0, percentage: 0 },
+    { hourLabel: '10 AM', acres: 0, ratePerHr: 0, percentage: 0 },
+    { hourLabel: '12 PM', acres: 0, ratePerHr: 0, percentage: 0 },
+    { hourLabel: '2 PM', acres: 0, ratePerHr: 0, percentage: 0 },
     {
       hourLabel: 'NOW',
-      acres: Number((24.5 + (equipmentState.totalAreaCoveredAcres > 0 ? equipmentState.totalAreaCoveredAcres : 0)).toFixed(1)),
-      ratePerHr: equipmentState.isRunning ? 3.5 : 0,
-      percentage: 100,
+      acres: Number(equipmentState.totalAreaCoveredAcres.toFixed(3)),
+      ratePerHr: equipmentState.isRunning ? equipmentState.speedKmh * 0.247 : 0, // rough conversion for UI 
+      percentage: Math.min(100, Math.round((equipmentState.totalAreaCoveredAcres / 50.0) * 100)),
     },
   ];
 
