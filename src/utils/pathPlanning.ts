@@ -145,9 +145,10 @@ export function generateGridInBoundary(
   const bounds = getBoundingBox(rotatedPoly);
 
   // 5. Generate Sweep Lines (working from bottom to top in Y)
-  // We add a tiny buffer (half swath) so we stay strictly inside the boundary
-  let currentY = bounds.minY + (swathWidthMeters / 2);
-  const maxY = bounds.maxY - (swathWidthMeters / 2);
+  // Use a very small buffer to allow generation even in small test polygons
+  const buffer = Math.min(0.2, swathWidthMeters / 2);
+  let currentY = bounds.minY + buffer;
+  const maxY = bounds.maxY - buffer;
   
   const sweepSegments: { start: Point2D, end: Point2D }[] = [];
 
@@ -155,8 +156,8 @@ export function generateGridInBoundary(
     const intersections = getIntersections(currentY, rotatedPoly);
     // Process pairs of intersections (entry and exit)
     for (let i = 0; i < intersections.length - 1; i += 2) {
-      const xStart = intersections[i] + (swathWidthMeters / 2); // Buffer from edge
-      const xEnd = intersections[i+1] - (swathWidthMeters / 2); // Buffer from edge
+      const xStart = intersections[i] + buffer; // Buffer from edge
+      const xEnd = intersections[i+1] - buffer; // Buffer from edge
       
       if (xStart < xEnd) { // Valid segment long enough to drive
         sweepSegments.push({

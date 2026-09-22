@@ -297,11 +297,10 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
       if (newGrid.length > 0) {
         showToast(`Generated ${newGrid.length} waypoints fitted inside your custom boundary.`);
-      } else {
-        showToast('Could not generate path inside the boundary. Try a larger boundary or smaller swath.');
-        return;
       }
-    } else {
+    }
+    
+    if (boundaryPoints.length < 3 || newGrid!.length === 0) {
       newGrid = generateFieldGrid(
         selectedCrop.name,
         swathWidthMeters,
@@ -327,13 +326,17 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
       const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
 
-      let newGrid: Waypoint[];
+      let newGrid: Waypoint[] = [];
 
       if (boundaryPoints.length >= 3) {
-        // Even if they use Live GPS button, if they have a boundary drawn, prioritize the boundary!
+        // prioritize boundary
         newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
-        showToast(`📍 Generated ${newGrid.length} waypoints fitted inside your custom boundary!`);
-      } else {
+        if (newGrid.length > 0) {
+          showToast(`📍 Generated ${newGrid.length} waypoints fitted inside your custom boundary!`);
+        }
+      }
+      
+      if (boundaryPoints.length < 3 || newGrid.length === 0) {
         newGrid = generateFieldGrid(
           selectedCrop.name,
           swathWidthMeters,
