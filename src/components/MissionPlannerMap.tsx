@@ -413,8 +413,26 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
 
       marker.addTo(layerGroup);
     });
+  }, [waypoints, activeWpIndex, boundaryPoints, measurePoints, mapMode, swathWidthMeters]);
 
-    // Auto-fit bounds on mission change
+  const hasAutoCenteredRef = useRef(false);
+
+  // Auto-center map on initial live location acquisition
+  useEffect(() => {
+    if (!mapInstanceRef.current || hasAutoCenteredRef.current) return;
+    
+    // Check if the telemetry has moved away from the hardcoded Punjab default
+    // This happens when MissionPlannerView automatically syncs the live device GPS
+    if (telemetry.lat !== 31.5204 && telemetry.lng !== 75.9064) {
+      mapInstanceRef.current.setView([telemetry.lat, telemetry.lng], 18, { animate: true });
+      hasAutoCenteredRef.current = true;
+    }
+  }, [telemetry.lat, telemetry.lng]);
+
+  // Auto-fit bounds on mission change
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
     if (waypoints.length > 0) {
       const bounds = L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng]));
       bounds.extend([telemetry.lat, telemetry.lng]);
