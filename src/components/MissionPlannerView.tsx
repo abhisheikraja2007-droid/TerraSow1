@@ -54,6 +54,7 @@ import {
   exportToQGCWPL,
   generateFieldGrid,
 } from '../data/missionPlannerData';
+import { generateGridInBoundary } from '../utils/pathPlanning';
 import { MissionPlannerService } from '../services/missionPlannerApi';
 import { MissionPlannerMap } from './MissionPlannerMap';
 import { FlightDataHUD } from './mission-planner/FlightDataHUD';
@@ -111,6 +112,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   // Live Telemetry
   const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
   const [activeWaypoints, setActiveWaypoints] = useState<Waypoint[]>([]);
+  const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
   const [activeWpIndex, setActiveWpIndex] = useState(0);
   const [mapDisplayType, setMapDisplayType] = useState<'satellite_map' | 'hud_grid'>('satellite_map');
 
@@ -289,19 +291,31 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
     const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
 
-    const newGrid = generateFieldGrid(
-      selectedCrop.name,
-      swathWidthMeters,
-      telemetry.lat,
-      telemetry.lng,
-      fieldLengthMeters,
-      fieldRowsCount,
-      targetDepth,
-      targetSpacing
-    );
+    let newGrid: Waypoint[];
+
+    if (boundaryPoints.length >= 3) {
+      newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
+      if (newGrid.length > 0) {
+        showToast(`Generated ${newGrid.length} waypoints fitted inside your custom boundary.`);
+      } else {
+        showToast('Could not generate path inside the boundary. Try a larger boundary or smaller swath.');
+        return;
+      }
+    } else {
+      newGrid = generateFieldGrid(
+        selectedCrop.name,
+        swathWidthMeters,
+        telemetry.lat,
+        telemetry.lng,
+        fieldLengthMeters,
+        fieldRowsCount,
+        targetDepth,
+        targetSpacing
+      );
+      showToast(`Generated ${newGrid.length} waypoints at rover location (${fieldRowsCount} rows, ${swathWidthMeters}m width).`);
+    }
 
     setActiveWaypoints(newGrid);
-    showToast(`Generated ${newGrid.length} waypoints for ${selectedCrop.name} (${fieldRowsCount} rows, ${swathWidthMeters}m width).`);
   };
 
   const handleGenerateGridAtUserGps = async () => {
@@ -313,16 +327,25 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
       const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
 
-      const newGrid = generateFieldGrid(
-        selectedCrop.name,
-        swathWidthMeters,
-        loc.lat,
-        loc.lng,
-        fieldLengthMeters,
-        fieldRowsCount,
-        targetDepth,
-        targetSpacing
-      );
+      let newGrid: Waypoint[];
+
+      if (boundaryPoints.length >= 3) {
+        // Even if they use Live GPS button, if they have a boundary drawn, prioritize the boundary!
+        newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
+        showToast(`📍 Generated ${newGrid.length} waypoints fitted inside your custom boundary!`);
+      } else {
+        newGrid = generateFieldGrid(
+          selectedCrop.name,
+          swathWidthMeters,
+          loc.lat,
+          loc.lng,
+          fieldLengthMeters,
+          fieldRowsCount,
+          targetDepth,
+          targetSpacing
+        );
+        showToast(`📍 Generated ${newGrid.length} waypoints centered at your live GPS location (${loc.lat.toFixed(6)}°, ${loc.lng.toFixed(6)}°)!`);
+      }
 
       // Also update telemetry coordinates to user's location
       setTelemetry((prev) => ({
@@ -334,7 +357,6 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       setActiveWaypoints(newGrid);
       playBeepSound(750, 0.15);
       hapticSuccess();
-      showToast(`📍 Generated ${newGrid.length} waypoints centered at your live GPS location (${loc.lat.toFixed(6)}°, ${loc.lng.toFixed(6)}°)!`);
     } catch (e: any) {
       showToast(e?.message || 'Could not acquire GPS position. Please check location permissions.');
     }
@@ -639,6 +661,8 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                 swathWidthMeters={swathWidthMeters}
                 activeWpIndex={activeWpIndex}
                 mapType={mapDisplayType}
+                boundaryPoints={boundaryPoints}
+                setBoundaryPoints={setBoundaryPoints}
               />
             </div>
 

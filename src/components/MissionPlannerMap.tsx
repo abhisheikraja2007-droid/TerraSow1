@@ -31,6 +31,8 @@ interface MissionPlannerMapProps {
   swathWidthMeters: number;
   mapType?: 'satellite_map' | 'hud_grid';
   onUpdateTelemetry?: React.Dispatch<React.SetStateAction<VehicleTelemetry>>;
+  boundaryPoints: [number, number][];
+  setBoundaryPoints: React.Dispatch<React.SetStateAction<[number, number][]>>;
 }
 
 type MapLayerType = 'satellite' | 'dark' | 'osm' | 'terrain';
@@ -43,6 +45,8 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   activeWpIndex = 0,
   swathWidthMeters,
   onUpdateTelemetry,
+  boundaryPoints,
+  setBoundaryPoints,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -57,7 +61,6 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   const [activeLayer, setActiveLayer] = useState<MapLayerType>('satellite');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mapMode, setMapMode] = useState<'view' | 'add_waypoint' | 'draw_boundary' | 'measure'>('view');
-  const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
   const [measurePoints, setMeasurePoints] = useState<[number, number][]>([]);
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
   const [isRoverEnabled, setIsRoverEnabled] = useState(false);
