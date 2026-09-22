@@ -102,19 +102,19 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   const [syncWithAppTelemetry, setSyncWithAppTelemetry] = useState(true);
   const wpTableContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll waypoints table to bottom when new points are added
-  useEffect(() => {
-    if (wpTableContainerRef.current) {
-      wpTableContainerRef.current.scrollTop = wpTableContainerRef.current.scrollHeight;
-    }
-  }, [activeWaypoints.length]);
-
   // Live Telemetry
   const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
   const [activeWaypoints, setActiveWaypoints] = useState<Waypoint[]>([]);
   const [boundaryPoints, setBoundaryPoints] = useState<[number, number][]>([]);
   const [activeWpIndex, setActiveWpIndex] = useState(0);
   const [mapDisplayType, setMapDisplayType] = useState<'satellite_map' | 'hud_grid'>('satellite_map');
+
+  // Auto-scroll waypoints table to bottom when new points are added
+  useEffect(() => {
+    if (wpTableContainerRef.current) {
+      wpTableContainerRef.current.scrollTop = wpTableContainerRef.current.scrollHeight;
+    }
+  }, [activeWaypoints.length]);
 
   // Grid Generator Controls
   const [swathWidthMeters, setSwathWidthMeters] = useState(2.4);
@@ -291,7 +291,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     const targetDepth = parseFloat(selectedCrop.sowingDepth.split('-')[0]) || 4.0;
     const targetSpacing = parseFloat(selectedCrop.seedSpacing.split('-')[0]) || 18.0;
 
-    let newGrid: Waypoint[];
+    let newGrid: Waypoint[] = [];
 
     if (boundaryPoints.length >= 3) {
       newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
