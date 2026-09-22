@@ -56,16 +56,13 @@ export default function App() {
     if (equipmentState.isRunning && !equipmentState.isEmergencyStopped) {
       interval = setInterval(() => {
         setEquipmentState((prev) => {
-          // 8.5 km/h over 1 second covers approx 0.0008 acres per second for 4-row implement
-          const deltaArea = (prev.speedKmh / 3600) * 0.35;
-          const newArea = prev.totalAreaCoveredAcres + deltaArea;
           const newDuration = prev.sessionDurationSeconds + 1;
           const newHopper = Math.max(5, prev.hopperLevelPercent - 0.02);
           const newBattery = Math.max(10, prev.batteryPercent - 0.005);
 
           return {
             ...prev,
-            totalAreaCoveredAcres: newArea,
+            // Area covered must come from wheel encoder, so keep it still here
             sessionDurationSeconds: newDuration,
             hopperLevelPercent: Number(newHopper.toFixed(2)),
             batteryPercent: Number(newBattery.toFixed(2)),
