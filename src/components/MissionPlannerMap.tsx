@@ -33,6 +33,7 @@ interface MissionPlannerMapProps {
   onUpdateTelemetry?: React.Dispatch<React.SetStateAction<VehicleTelemetry>>;
   boundaryPoints: [number, number][];
   setBoundaryPoints: React.Dispatch<React.SetStateAction<[number, number][]>>;
+  onGenerateBoundaryGrid: () => void;
 }
 
 type MapLayerType = 'satellite' | 'dark' | 'osm' | 'terrain';
@@ -47,6 +48,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
   onUpdateTelemetry,
   boundaryPoints,
   setBoundaryPoints,
+  onGenerateBoundaryGrid,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -705,119 +707,12 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     playClickSound();
     hapticSuccess();
 
-    // Bounding Box of Polygon
-    const lats = boundaryPoints.map((p) => p[0]);
-    const lngs = boundaryPoints.map((p) => p[1]);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-
-    const latSpan = maxLat - minLat;
-    const lngSpan = maxLng - minLng;
-
-    // Estimate swath rows
-    const lngStep = (swathWidthMeters / 111320) * 1.2;
-    const numRows = Math.max(3, Math.min(16, Math.floor(lngSpan / lngStep)));
-
-    const newWaypoints: Waypoint[] = [];
-    let wpIdx = 0;
-
-    // Home
-    newWaypoints.push({
-      index: wpIdx++,
-      command: 'WAYPOINT',
-      lat: minLat,
-      lng: minLng,
-      alt: 0,
-      param1: 0,
-      param2: 1.0,
-      param3: 0,
-      param4: 0,
-      seederActive: false,
-      speedKmh: 4.0,
-      targetDepthCm: parseFloat(selectedCrop.sowingDepth) || 4.0,
-      targetSpacingCm: parseFloat(selectedCrop.seedSpacing) || 18.0,
-    });
-
-    for (let r = 0; r < numRows; r++) {
-      const curLng = minLng + r * (lngSpan / numRows);
-      const isEven = r % 2 === 0;
-      const startLat = isEven ? minLat : maxLat;
-      const endLat = isEven ? maxLat : minLat;
-
-      // Start of row -> Seeder ON
-      newWaypoints.push({
-        index: wpIdx++,
-        command: 'DO_SET_SERVO',
-        lat: startLat,
-        lng: curLng,
-        alt: 0,
-        param1: 9,
-        param2: 1800,
-        param3: 0,
-        param4: 0,
-        seederActive: true,
-        speedKmh: 8.5,
-        targetDepthCm: parseFloat(selectedCrop.sowingDepth) || 4.0,
-        targetSpacingCm: parseFloat(selectedCrop.seedSpacing) || 18.0,
-      });
-
-      // End of row
-      newWaypoints.push({
-        index: wpIdx++,
-        command: 'WAYPOINT',
-        lat: endLat,
-        lng: curLng,
-        alt: 0,
-        param1: 0,
-        param2: 1.0,
-        param3: 0,
-        param4: 0,
-        seederActive: true,
-        speedKmh: 8.5,
-        targetDepthCm: parseFloat(selectedCrop.sowingDepth) || 4.0,
-        targetSpacingCm: parseFloat(selectedCrop.seedSpacing) || 18.0,
-      });
-
-      // Headland Turn -> Seeder OFF
-      newWaypoints.push({
-        index: wpIdx++,
-        command: 'DO_SET_SERVO',
-        lat: endLat,
-        lng: curLng,
-        alt: 0,
-        param1: 9,
-        param2: 1000,
-        param3: 0,
-        param4: 0,
-        seederActive: false,
-        speedKmh: 3.5,
-        targetDepthCm: 0,
-        targetSpacingCm: parseFloat(selectedCrop.seedSpacing) || 18.0,
-      });
-    }
-
-    // RTL
-    newWaypoints.push({
-      index: wpIdx++,
-      command: 'RETURN_TO_LAUNCH',
-      lat: minLat,
-      lng: minLng,
-      alt: 0,
-      param1: 0,
-      param2: 0,
-      param3: 0,
-      param4: 0,
-      seederActive: false,
-      speedKmh: 5.0,
-      targetDepthCm: 0,
-      targetSpacingCm: 18.0,
-    });
-
-    onWaypointsChange(newWaypoints);
-    setBoundaryPoints([]);
+    const bounds = L.latLngBounds(boundaryPoints);
+    mapInstanceRef.current?.fitBounds(bounds, { padding: [20, 20] });
+    
     setMapMode('view');
+    // Call the parent component's grid generator which uses the advanced path planning algorithm
+    onGenerateBoundaryGrid();
   };
 
   return (
@@ -876,7 +771,7 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
             title="Draw field boundary to auto-fit grid"
           >
             <Crosshair className="w-3.5 h-3.5" />
-            <span>Boundary</span>
+            <span>Mark Boundary</span>
           </button>
 
           <button

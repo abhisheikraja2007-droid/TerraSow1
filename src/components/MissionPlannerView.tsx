@@ -667,6 +667,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                 mapType={mapDisplayType}
                 boundaryPoints={boundaryPoints}
                 setBoundaryPoints={setBoundaryPoints}
+                onGenerateBoundaryGrid={handleGenerateGrid}
               />
             </div>
 
