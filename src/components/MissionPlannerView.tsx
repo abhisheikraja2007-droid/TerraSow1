@@ -99,6 +99,14 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   const [isConnected, setIsConnected] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [syncWithAppTelemetry, setSyncWithAppTelemetry] = useState(true);
+  const wpTableContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll waypoints table to bottom when new points are added
+  useEffect(() => {
+    if (wpTableContainerRef.current) {
+      wpTableContainerRef.current.scrollTop = wpTableContainerRef.current.scrollHeight;
+    }
+  }, [activeWaypoints.length]);
 
   // Live Telemetry
   const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
@@ -832,7 +840,10 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
               <span className="text-[10px] font-mono text-gray-500 font-bold">Auto-increment</span>
             </div>
 
-            <div className="max-h-[340px] overflow-x-auto overflow-y-auto border border-gray-200 rounded-xl">
+            <div 
+              ref={wpTableContainerRef}
+              className="max-h-[340px] overflow-x-auto overflow-y-auto border border-gray-200 rounded-xl scroll-smooth"
+            >
               <table className="w-full text-left text-xs whitespace-nowrap">
                 <thead className="bg-[#f1f4f9] border-b-2 border-gray-300 text-gray-700 font-black uppercase sticky top-0">
                   <tr>
