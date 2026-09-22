@@ -431,8 +431,8 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     const tractorLng = telemetry.lng;
     const heading = telemetry.headingDeg;
 
-    // Update Breadcrumbs
-    if (breadcrumbsRef.current) {
+    // Update Breadcrumbs ONLY if rover mapping is active
+    if (breadcrumbsRef.current && isRoverEnabled) {
       breadcrumbsRef.current.addLatLng([tractorLat, tractorLng]);
     }
 
@@ -555,6 +555,11 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
             rtkAccuracyCm: Math.min(accuracy * 100, 2.5),
             gpsFixType: 'RTK_FIXED',
           }));
+        }
+
+        // Clear any old breadcrumbs so we don't draw a massive line from the previous location
+        if (breadcrumbsRef.current) {
+          breadcrumbsRef.current.setLatLngs([]);
         }
 
         // We just locate the user. We no longer auto-generate the grid here,
