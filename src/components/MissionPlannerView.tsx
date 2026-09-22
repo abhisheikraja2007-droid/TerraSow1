@@ -166,6 +166,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
   }, [activeWaypoints, swathWidthMeters]);
 
   // Sync telemetry rover location with physical device GPS location
+  // We no longer generate an initial fake grid on load to keep the map clean for the user's live location.
   useEffect(() => {
     if (userGeoLocation) {
       setTelemetry((prev) => ({
@@ -297,10 +298,10 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
       newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
       if (newGrid.length > 0) {
         showToast(`Generated ${newGrid.length} waypoints fitted inside your custom boundary.`);
+      } else {
+        showToast('Could not generate path inside the boundary. Try a larger boundary or smaller swath.');
       }
-    }
-    
-    if (boundaryPoints.length < 3 || newGrid!.length === 0) {
+    } else {
       newGrid = generateFieldGrid(
         selectedCrop.name,
         swathWidthMeters,
@@ -333,10 +334,10 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
         newGrid = generateGridInBoundary(boundaryPoints, swathWidthMeters, targetDepth, targetSpacing);
         if (newGrid.length > 0) {
           showToast(`📍 Generated ${newGrid.length} waypoints fitted inside your custom boundary!`);
+        } else {
+          showToast('Could not generate path inside the boundary. Try a larger boundary or smaller swath.');
         }
-      }
-      
-      if (boundaryPoints.length < 3 || newGrid.length === 0) {
+      } else {
         newGrid = generateFieldGrid(
           selectedCrop.name,
           swathWidthMeters,
