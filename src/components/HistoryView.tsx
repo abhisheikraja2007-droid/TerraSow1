@@ -75,7 +75,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             playClickSound();
             setShowFilterModal(true);
           }}
-          className="bg-white border-2 border-[#012d1d] text-[#012d1d] px-4 py-2 font-bold text-[16px] rounded-lg flex items-center gap-2 hover:bg-[#f1f4f9] active:scale-95 transition-all min-h-[48px] cursor-pointer shadow-xs font-['Public_Sans']"
+          className="bg-white border-2 border-[#012d1d] text-[#012d1d] px-4 py-2 font-bold text-[16px] rounded-lg flex items-center gap-2 hover:bg-[#f1f4f9] active:scale-95 transition-all min-h-12 cursor-pointer shadow-xs font-['Public_Sans']"
         >
           <Filter className="w-5 h-5 stroke-[2.5]" />
           <span>Filter</span>

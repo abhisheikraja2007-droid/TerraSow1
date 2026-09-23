@@ -119,7 +119,7 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] sm:min-h-screen w-full bg-gradient-to-br from-[#0c1219] via-[#121c24] to-[#070b0e] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden sm:overflow-x-hidden select-none">
+    <div className="min-h-dvh sm:min-h-screen w-full bg-linear-to-br from-[#0c1219] via-[#121c24] to-[#070b0e] flex flex-col items-center justify-start sm:justify-center p-0 sm:p-4 md:p-6 overflow-hidden sm:overflow-x-hidden select-none">
       {/* Top Desktop Frame Controls Floating Toolbar */}
       <div className="hidden sm:flex items-center justify-between w-full max-w-xl mb-3 px-4 py-2 bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 text-white shadow-xl z-50 text-xs">
         <div className="flex items-center gap-2">
@@ -208,27 +208,27 @@ export const IPhone13Frame: React.FC<IPhone13FrameProps> = ({ children }) => {
 
       {/* Main iPhone 13 Mockup Chassis Container */}
       <div
-        className="transition-transform duration-200 ease-out origin-top sm:my-auto w-full sm:w-auto max-sm:!transform-none"
+        className="transition-transform duration-200 ease-out origin-top sm:my-auto w-full sm:w-auto max-sm:transform-none!"
         style={{
           transform: `scale(${scale})`,
         }}
       >
         <div
           id="iphone-13-chassis"
-          className={`relative w-full sm:w-[414px] h-[100dvh] sm:h-[870px] ${currentColor.bodyBg} sm:p-[12px] sm:rounded-[54px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1),0_0_40px_rgba(45,106,79,0.15)] flex flex-col items-center justify-between border-0 sm:border-2 ${currentColor.outerBorder}`}
+          className={`relative w-full sm:w-103.5 h-dvh sm:h-217.5 ${currentColor.bodyBg} sm:p-3 sm:rounded-[54px] sm:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1),0_0_40px_rgba(45,106,79,0.15)] flex flex-col items-center justify-between border-0 sm:border-2 ${currentColor.outerBorder}`}
         >
           {/* Hardware Hardware Left Buttons (Silent switch, Vol+, Vol-) */}
-          <div className="hidden sm:block absolute -left-[7px] top-[115px] w-[5px] h-[26px] bg-[#22252a] rounded-l-md border border-white/10" />
-          <div className="hidden sm:block absolute -left-[7px] top-[165px] w-[5px] h-[48px] bg-[#22252a] rounded-l-md border border-white/10" />
-          <div className="hidden sm:block absolute -left-[7px] top-[225px] w-[5px] h-[48px] bg-[#22252a] rounded-l-md border border-white/10" />
+          <div className="hidden sm:block absolute -left-1.75 top-28.75 w-1.25 h-6.5 bg-[#22252a] rounded-l-md border border-white/10" />
+          <div className="hidden sm:block absolute -left-1.75 top-41.25 w-1.25 h-12 bg-[#22252a] rounded-l-md border border-white/10" />
+          <div className="hidden sm:block absolute -left-1.75 top-56.25 w-1.25 h-12 bg-[#22252a] rounded-l-md border border-white/10" />
 
           {/* Hardware Right Button (Power / Siri) */}
-          <div className="hidden sm:block absolute -right-[7px] top-[175px] w-[5px] h-[72px] bg-[#22252a] rounded-r-md border border-white/10" />
+          <div className="hidden sm:block absolute -right-1.75 top-43.75 w-1.25 h-18 bg-[#22252a] rounded-r-md border border-white/10" />
 
           {/* Inner Screen Display (Exact 390px × 844px iPhone 13 logical resolution) */}
           <div
             id="iphone-13-screen"
-            className="relative w-full sm:w-[390px] h-full sm:h-[844px] bg-[#f7f9ff] text-[#181c20] sm:rounded-[44px] overflow-hidden flex flex-col shadow-inner border-0 sm:border border-black/80"
+            className="relative w-full sm:w-97.5 h-full sm:h-211 bg-[#f7f9ff] text-[#181c20] sm:rounded-[44px] overflow-hidden flex flex-col shadow-inner border-0 sm:border border-black/80"
           >
             {/* Application Scrollable Body Area */}
             <div

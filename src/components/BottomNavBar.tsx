@@ -32,7 +32,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
   return (
     <nav
       id="bottom-nav-bar"
-      className="sticky bottom-0 left-0 w-full z-40 bg-white border-t-[3px] border-[#0A0A0A] min-h-[64px] h-auto pb-[max(env(safe-area-inset-bottom),8px)] pt-1 px-1.5 grid grid-cols-5 gap-1 items-center shadow-[0_-4px_16px_rgba(0,0,0,0.08)] select-none shrink-0"
+      className="sticky bottom-0 left-0 w-full z-40 bg-white border-t-[3px] border-[#0A0A0A] min-h-16 h-auto pb-[max(env(safe-area-inset-bottom),8px)] pt-1 px-1.5 grid grid-cols-5 gap-1 items-center shadow-[0_-4px_16px_rgba(0,0,0,0.08)] select-none shrink-0"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -43,7 +43,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
             key={tab.id}
             id={`nav-btn-${tab.id}`}
             onClick={() => handleTabClick(tab.id)}
-            className={`relative flex flex-col items-center justify-center w-full h-[52px] rounded-xl transition-all duration-150 cursor-pointer active:scale-95 ${
+            className={`relative flex flex-col items-center justify-center w-full h-13 rounded-xl transition-all duration-150 cursor-pointer active:scale-95 ${
               isActive
                 ? 'bg-[#012d1d] text-white shadow-sm font-black'
                 : 'text-gray-600 hover:text-black hover:bg-gray-100'

@@ -102,12 +102,14 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
     const layerGroup = L.layerGroup().addTo(map);
     layerGroupRef.current = layerGroup;
 
-    // Breadcrumbs trail
+    // Breadcrumbs trail (thick swath painting)
     const breadcrumbs = L.polyline([], {
-      color: '#4ade80',
-      weight: 3,
-      opacity: 0.8,
-      dashArray: '5, 8',
+      color: '#22c55e',
+      weight: 15,
+      opacity: 0.5,
+      dashArray: '',
+      lineCap: 'round',
+      lineJoin: 'round',
     }).addTo(map);
     breadcrumbsRef.current = breadcrumbs;
 
@@ -335,7 +337,12 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       let borderColor = '#0A0A0A';
       let badgeLabel = `WP ${idx}`;
 
-      if (isServo) {
+      if (wp.isCompleted) {
+        bgColor = '#22c55e';
+        textColor = '#ffffff';
+        borderColor = '#16a34a';
+        badgeLabel = `✓ ${badgeLabel}`;
+      } else if (isServo) {
         bgColor = wp.seederActive ? '#2D6A4F' : '#b45309';
         textColor = '#ffffff';
         borderColor = wp.seederActive ? '#4ade80' : '#f59e0b';
@@ -917,14 +924,14 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
 
       {/* Leaflet Map Canvas Container */}
       <div
-        className={`relative w-full ${isFullscreen ? 'flex-1 min-h-[500px]' : 'h-[360px] sm:h-[420px]'} border-4 border-[#0A0A0A] rounded-2xl overflow-hidden shadow-md bg-[#18231c]`}
+        className={`relative w-full ${isFullscreen ? 'flex-1 min-h-125' : 'h-90 sm:h-105'} border-4 border-[#0A0A0A] rounded-2xl overflow-hidden shadow-md bg-[#18231c]`}
       >
         <div ref={mapContainerRef} className="w-full h-full z-10" />
 
         {/* Unlocated Overlay: Prompts user to click Locate Me to enable mapping & rover */}
         {!isRoverEnabled && (
           <div className="absolute inset-0 z-20 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center select-none">
-            <div className="bg-[#012d1d] border-2 border-[#4ade80] rounded-2xl p-5 shadow-2xl max-w-[280px] sm:max-w-xs flex flex-col items-center gap-3 animate-fadeIn">
+            <div className="bg-[#012d1d] border-2 border-[#4ade80] rounded-2xl p-5 shadow-2xl max-w-70 sm:max-w-xs flex flex-col items-center gap-3 animate-fadeIn">
               <div className="w-12 h-12 rounded-full bg-emerald-500/20 border-2 border-[#4ade80] flex items-center justify-center text-[#4ade80]">
                 <LocateFixed className="w-6 h-6 animate-pulse" />
               </div>

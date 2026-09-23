@@ -126,6 +126,38 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
     }
   }, [activeWaypoints.length]);
 
+  // Check waypoints completion based on live telemetry
+  useEffect(() => {
+    if (activeWaypoints.length > 0 && telemetry.lat !== 0) {
+      setActiveWaypoints((prev) => {
+        let changed = false;
+        const updated = prev.map((wp) => {
+          if (!wp.isCompleted) {
+            // Haversine distance
+            const R = 6371e3; // meters
+            const lat1 = (telemetry.lat * Math.PI) / 180;
+            const lat2 = (wp.lat * Math.PI) / 180;
+            const dLat = ((wp.lat - telemetry.lat) * Math.PI) / 180;
+            const dLng = ((wp.lng - telemetry.lng) * Math.PI) / 180;
+
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            if (distance < 3.0) {
+              changed = true;
+              return { ...wp, isCompleted: true };
+            }
+          }
+          return wp;
+        });
+        return changed ? updated : prev;
+      });
+    }
+  }, [telemetry.lat, telemetry.lng]);
+
   // Grid Generator Controls
   const [swathWidthMeters, setSwathWidthMeters] = useState(2.4);
   const [fieldRowsCount, setFieldRowsCount] = useState(6);
@@ -861,7 +893,7 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
 
             <div 
               ref={wpTableContainerRef}
-              className="max-h-[340px] overflow-x-auto overflow-y-auto border border-gray-200 rounded-xl scroll-smooth"
+              className="max-h-85 overflow-x-auto overflow-y-auto border border-gray-200 rounded-xl scroll-smooth"
             >
               <table className="w-full text-left text-xs whitespace-nowrap">
                 <thead className="bg-[#f1f4f9] border-b-2 border-gray-300 text-gray-700 font-black uppercase sticky top-0">
@@ -879,11 +911,16 @@ export const MissionPlannerView: React.FC<MissionPlannerViewProps> = ({
                   {activeWaypoints.map((wp, idx) => (
                     <tr
                       key={wp.index}
-                      className={`hover:bg-[#f7f9ff] transition-colors ${
-                        activeWpIndex === idx ? 'bg-emerald-50 font-bold' : ''
-                      }`}
+                      className={`transition-colors cursor-pointer ${
+                        wp.isCompleted
+                          ? 'bg-emerald-50 opacity-75'
+                          : 'hover:bg-[#f7f9ff]'
+                      } ${activeWpIndex === idx && !wp.isCompleted ? 'bg-blue-50 border-l-2 border-blue-500 font-bold' : ''}`}
+                      onClick={() => setActiveWpIndex(idx)}
                     >
-                      <td className="p-2.5 font-bold text-gray-600">{wp.index}</td>
+                      <td className="p-2.5 font-bold text-gray-600">
+                        {wp.isCompleted ? <span className="text-emerald-600">✓</span> : wp.index}
+                      </td>
                       <td className="p-2.5">
                         <select
                           value={wp.command}

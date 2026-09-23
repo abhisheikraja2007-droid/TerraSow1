@@ -158,7 +158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="grid grid-cols-3 gap-2 mt-3 pl-1.5">
             <button
               onClick={handleEmergencyStop}
-              className="h-[42px] bg-[#D00000] hover:bg-[#b00000] text-white font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1 border-2 border-[#930000] active:scale-[0.98] transition-transform cursor-pointer uppercase tracking-wider font-['Public_Sans']"
+              className="h-10.5 bg-[#D00000] hover:bg-[#b00000] text-white font-extrabold text-[11px] rounded-xl flex items-center justify-center gap-1 border-2 border-[#930000] active:scale-[0.98] transition-transform cursor-pointer uppercase tracking-wider font-['Public_Sans']"
             >
               <AlertOctagon className="w-3.5 h-3.5 fill-current shrink-0" />
               <span>STOP</span>
@@ -166,7 +166,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={() => setShowAdjustModal(true)}
-              className="h-[42px] bg-white text-[#396093] hover:bg-gray-50 font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 border border-[#396093] active:scale-[0.98] transition-all cursor-pointer font-['Public_Sans']"
+              className="h-10.5 bg-white text-[#396093] hover:bg-gray-50 font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 border border-[#396093] active:scale-[0.98] transition-all cursor-pointer font-['Public_Sans']"
             >
               <Sliders className="w-3.5 h-3.5 shrink-0" />
               <span>Adjust</span>
@@ -174,7 +174,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={onNavigateToControl}
-              className="h-[42px] bg-[#1b4332] text-white hover:bg-[#012d1d] font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 border border-[#0A0A0A] active:scale-[0.98] transition-all cursor-pointer font-['Public_Sans']"
+              className="h-10.5 bg-[#1b4332] text-white hover:bg-[#012d1d] font-bold text-[11px] rounded-xl flex items-center justify-center gap-1 border border-[#0A0A0A] active:scale-[0.98] transition-all cursor-pointer font-['Public_Sans']"
             >
               <span>D-Pad</span>
             </button>
@@ -188,7 +188,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-9 h-9 rounded-xl bg-[#c1ecd4] border border-[#012d1d] flex items-center justify-center text-[#012d1d] shrink-0">
               <BatteryCharging className="w-4 h-4" />
             </div>
-            <div className="flex-grow">
+            <div className="grow">
               <div className="flex justify-between items-end mb-1">
                 <span className="font-bold text-[11px] text-gray-700 uppercase tracking-wide">
                   Battery (48V)
@@ -211,7 +211,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-9 h-9 rounded-xl bg-[#ffe5d9] border border-[#d97706] flex items-center justify-center text-[#9c6644] shrink-0">
               <Layers className="w-4 h-4" />
             </div>
-            <div className="flex-grow">
+            <div className="grow">
               <div className="flex justify-between items-end mb-1">
                 <span className="font-bold text-[11px] text-gray-700 uppercase tracking-wide">
                   Hopper Bin
@@ -272,7 +272,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div key={item.hourLabel} className="flex-1 flex flex-col items-center h-full justify-end group relative">
                   <div
-                    className={`w-full max-w-[28px] border border-[#012d1d] rounded-t transition-all duration-300 ${
+                    className={`w-full max-w-7 border border-[#012d1d] rounded-t transition-all duration-300 ${
                       isNow
                         ? 'bg-[#012d1d]'
                         : idx === 2

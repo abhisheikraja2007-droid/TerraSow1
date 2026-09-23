@@ -157,6 +157,7 @@ export interface Waypoint {
   targetDepthCm: number;
   targetSpacingCm: number;
   label?: string;
+  isCompleted?: boolean;
 }
 
 export interface FieldMission {
