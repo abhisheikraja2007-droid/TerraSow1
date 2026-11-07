@@ -3,6 +3,7 @@ import { ActiveTab, CropProfile, EquipmentState, HistoryEntry, VehicleTelemetry 
 import { MissionPlannerService } from './services/missionPlannerApi';
 import { CROPS_DATA } from './data/cropsData';
 import { INITIAL_HISTORY } from './data/historyData';
+import { INITIAL_VEHICLE_TELEMETRY } from './data/missionPlannerData';
 import { IPhone13Frame } from './components/IPhone13Frame';
 import { TopAppBar } from './components/TopAppBar';
 import { BottomNavBar } from './components/BottomNavBar';
@@ -53,20 +54,7 @@ export default function App() {
 
   // Global MAVLink Telemetry State
   const [isConnected, setIsConnected] = useState(false);
-  const [telemetry, setTelemetry] = useState<VehicleTelemetry>({
-    lat: 30.900965,
-    lng: 75.857275,
-    alt: 245.5,
-    headingDeg: 90,
-    groundspeedKmh: 0,
-    armed: false,
-    mode: 'HOLD',
-    satellitesCount: 0,
-    gpsFixType: 'NO_FIX',
-    rtkAccuracyCm: 99.9,
-    batteryVoltage: 0,
-    batteryRemainingPct: 0,
-  });
+  const [telemetry, setTelemetry] = useState<VehicleTelemetry>(INITIAL_VEHICLE_TELEMETRY);
 
   const [telemetryHistory, setTelemetryHistory] = useState<[number, number][]>([]);
 
@@ -99,7 +87,7 @@ export default function App() {
             gpsAccuracyCm: data.rtkAccuracyCm,
             steeringAngleDeg: data.headingDeg % 30,
             rtkStatus: data.gpsFixType === 'RTK_FIXED' ? 'FIXED' : 'FLOAT',
-            batteryPercent: data.batteryRemainingPct,
+            batteryPercent: data.batteryRemainingPercent,
           }));
 
           // Track physical movement for Area Covered & Breadcrumbs
