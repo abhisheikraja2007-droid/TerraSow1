@@ -11,14 +11,22 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        injectRegister: 'auto',
+        includeAssets: [
+          'favicon.ico',
+          'apple-touch-icon.png',
+          'icon.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+        ],
         manifest: {
           id: '/',
-          name: 'AgriControl Pro',
+          name: 'AgriControl Pro - Precision Seeder',
           short_name: 'AgriControl',
-          description: 'Smart precision agriculture equipment control and live telemetry dashboard.',
+          description: 'Smart precision agriculture equipment control and offline sowing telemetry dashboard.',
           theme_color: '#012d1d',
-          background_color: '#f7f9ff',
+          background_color: '#0B0F17',
           display: 'standalone',
           orientation: 'portrait-primary',
           start_url: '/',
@@ -46,15 +54,35 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2,webmanifest}'],
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'pages-cache',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year offline
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'google-fonts-cache',
                 expiration: {
-                  maxEntries: 10,
+                  maxEntries: 20,
                   maxAgeSeconds: 60 * 60 * 24 * 365,
                 },
                 cacheableResponse: {
@@ -68,8 +96,22 @@ export default defineConfig(() => {
               options: {
                 cacheName: 'gstatic-fonts-cache',
                 expiration: {
-                  maxEntries: 10,
+                  maxEntries: 30,
                   maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'osm-tiles-cache',
+                expiration: {
+                  maxEntries: 1000,
+                  maxAgeSeconds: 60 * 60 * 24 * 90,
                 },
                 cacheableResponse: {
                   statuses: [0, 200],
@@ -90,10 +132,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

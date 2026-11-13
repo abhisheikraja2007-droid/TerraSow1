@@ -19,10 +19,38 @@ import { PWAInstallBanner } from './components/PWAInstallBanner';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('control');
-  const [selectedCrop, setSelectedCrop] = useState<CropProfile>(CROPS_DATA[1]); // Default to Wheat (Crop #2)
-  const [historyList, setHistoryList] = useState<HistoryEntry[]>(INITIAL_HISTORY);
+  const [selectedCrop, setSelectedCrop] = useState<CropProfile>(() => {
+    try {
+      const saved = localStorage.getItem('agricontrol_selected_crop');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const match = CROPS_DATA.find((c) => c.id === parsed.id);
+        if (match) return match;
+      }
+    } catch {}
+    return CROPS_DATA[1];
+  });
+  const [historyList, setHistoryList] = useState<HistoryEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('agricontrol_history');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_HISTORY;
+  });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('agricontrol_selected_crop', JSON.stringify(selectedCrop));
+    } catch {}
+  }, [selectedCrop]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('agricontrol_history', JSON.stringify(historyList));
+    } catch {}
+  }, [historyList]);
 
   // Hardware Config
   const [units, setUnits] = useState<'metric' | 'imperial'>('metric');
