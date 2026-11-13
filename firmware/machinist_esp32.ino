@@ -1,5 +1,6 @@
 /* =====================================================================================
  * MACHINIST ESP32 - PRECISION CALIBRATED MOVEMENT & HIGH-SPEED SERVO CONTROLLER
+ * WITH CROP-SPECIFIC AUTONOMOUS STEP-AND-SOW DISTANCE ENGINE
  * =====================================================================================
  * MOVEMENT MAPPING:
  *   [W] FORWARD:  Both Left & Right wheels drive Forward together (Straight)
@@ -13,6 +14,12 @@
  *   LEFT +45°:    Left Seeding (135 deg)
  *   RIGHT -45°:   Right Seeding (45 deg)
  *   MULTI-SEED:   Fast 120ms automatic oscillation (0 -> +45 -> 0 -> -45)
+ *
+ * AUTONOMOUS STEP-AND-SOW (CROP-TO-CROP DISTANCE):
+ *   Command:      SEED_RUN:<cm> (e.g., SEED_RUN:18 for Wheat, SEED_RUN:25 for Maize)
+ *   Action:       Drives forward by exact crop spacing -> stops -> dispenses seed
+ *                 via 45° hopper swing -> centers -> moves to next seed location!
+ *   Stop:         SEED_STOP, STOP, or ESTOP immediately halts auto-sowing.
  * =====================================================================================
  * PINOUT ASSIGNMENTS:
  *   Left Motor PWM:    Pin 4
@@ -41,7 +48,7 @@
 // =====================================================================================
 // --- MOTOR FORWARD DIRECTION CONFIGURATION ---
 // If pressing W turns or one wheel goes reverse, flip that motor's FWD setting:
-// =====================================================================
+// =====================================================================================
 const uint8_t LEFT_FWD_DIR  = HIGH; // Left wheel forward state
 const uint8_t RIGHT_FWD_DIR = HIGH; // Right wheel forward state (change to LOW if right spins backward)
 
@@ -96,8 +103,30 @@ const int HOPPER_RIGHT_ANGLE  = 45;  // -45° Right Seed (90 - 45)
 bool isMultiSeeding = false;
 uint32_t lastSeedStep = 0;
 uint8_t multiSeedState = 0; 
-// HIGH SPEED: 120ms per step = 480ms per complete dual-side cycle
-const uint32_t SEED_STEP_DELAY = 120; 
+const uint32_t SEED_STEP_DELAY = 120; // 120ms per step = rapid high-speed dispense
+
+// --- AUTONOMOUS STEP-AND-SOW DISTANCE CALIBRATION ---
+// 1 cm = ~42 milliseconds at roverSpeed (255)
+// Or ~1.8 encoder pulses per cm
+const uint32_t DRIVE_MS_PER_CM = 42; 
+const float ENCODER_PULSES_PER_CM = 1.8f; 
+
+enum AutoSowState {
+  SOW_IDLE,
+  SOW_MOVE,
+  SOW_STOP_SETTLE,
+  SOW_DISPENSE,
+  SOW_RETURN_CENTER
+};
+
+AutoSowState autoSowState = SOW_IDLE;
+bool isAutoSowing = false;
+int targetSpacingCm = 18;
+int seedCount = 0;
+uint32_t sowStateStartTime = 0;
+int32_t startLeftPulses = 0;
+int32_t startRightPulses = 0;
+bool alternateSide = false;
 
 enum DriveState { DRIVE_STOP, DRIVE_FWD, DRIVE_BWD, DRIVE_LEFT, DRIVE_RIGHT };
 DriveState currentDrive = DRIVE_STOP;
@@ -121,15 +150,15 @@ void writeServoAngle(uint8_t pin, uint8_t channel, int angle) {
 #endif
 }
 
-void writeMotorPwm(uint8_t pin, uint8_t channel, uint8_t speed) {
+void writeMotorPwm(uint8_t pin, uint8_t channel, uint8_t duty) {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
-  ledcWrite(pin, speed);
+  ledcWrite(pin, duty);
 #else
-  ledcWrite(channel, speed);
+  ledcWrite(channel, duty);
 #endif
 }
 
-// --- OPTICAL ENCODER INTERRUPTS ---
+// --- INTERRUPTS & ENCODER FILTER ---
 volatile uint32_t lastLeftPulse = 0;
 volatile uint32_t lastRightPulse = 0;
 const uint32_t DEBOUNCE_DELAY = 5000; 
@@ -154,58 +183,54 @@ void IRAM_ATTR rightEncoderISR() {
   }
 }
 
-// =====================================================================================
-// --- EXACT ROVER MOVEMENTS [W, S, A, D] ---
-// =====================================================================================
-
-// [STOP] - Full motor brake
+// --- ROVER WHEEL MOTION FUNCTIONS ---
 void stopMotors() { 
   currentDrive = DRIVE_STOP;
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, 0); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, 0); 
 }
 
-// [W] FORWARD - Both left and right wheels drive straight forward
+// [W] KEY: Straight Forward (Both Wheels Move Forward Together)
 void moveForward() { 
   currentDrive = DRIVE_FWD;
   digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR); 
   digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); 
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
-  Serial.println("DRIVE -> [W] FORWARD (Straight)");
+  Serial.println("DRIVE -> FORWARD [W]");
 }
 
-// [S] BACKWARD - Both left and right wheels drive straight backward
+// [S] KEY: Straight Backward (Both Wheels Reverse Together)
 void moveBackward() { 
   currentDrive = DRIVE_BWD;
   digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR); 
   digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); 
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
-  Serial.println("DRIVE -> [S] BACKWARD (Straight)");
+  Serial.println("DRIVE -> BACKWARD [S]");
 }
 
-// [A] ROTATE LEFT - Left wheel reverses, Right wheel drives forward
+// [A] KEY: Rotate Left in Place (Left Reverse, Right Forward)
 void rotateLeft() { 
   currentDrive = DRIVE_LEFT;
   digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR); 
   digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); 
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
-  Serial.println("DRIVE -> [A] ROTATE LEFT");
+  Serial.println("DRIVE -> ROTATE LEFT [A]");
 }
 
-// [D] ROTATE RIGHT - Left wheel drives forward, Right wheel reverses
+// [D] KEY: Rotate Right in Place (Left Forward, Right Reverse)
 void rotateRight() { 
   currentDrive = DRIVE_RIGHT;
   digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR); 
   digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); 
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
-  Serial.println("DRIVE -> [D] ROTATE RIGHT");
+  Serial.println("DRIVE -> ROTATE RIGHT [D]");
 }
 
-// --- LINEAR DEPTH ACTUATOR ---
+// --- LINEAR ACTUATOR ---
 void actuatorStop() { 
   digitalWrite(ACT_EN_PIN, LOW); 
   digitalWrite(ACT_IN1_PIN, LOW); 
@@ -285,6 +310,8 @@ void npkDown() {
 
 // --- EMERGENCY STOP ALL ---
 void allActuatorsStop() { 
+  isAutoSowing = false;
+  autoSowState = SOW_IDLE;
   stopMotors(); 
   actuatorStop(); 
   stopDrill(); 
@@ -305,6 +332,32 @@ void processCommand(String command) {
   
   Serial.println("EXEC -> " + command);
 
+  // Crop-Specific Autonomous Step-and-Sow Run
+  if (command.startsWith("SEED_RUN:")) {
+    int cm = command.substring(9).toInt();
+    if (cm <= 0) cm = 18;
+    targetSpacingCm = cm;
+    isAutoSowing = true;
+    seedCount = 0;
+    alternateSide = false;
+    autoSowState = SOW_MOVE;
+    startLeftPulses = pulsesLeft;
+    startRightPulses = pulsesRight;
+    sowStateStartTime = millis();
+    moveForward();
+    Serial.println("AUTOSOW -> Started for " + String(targetSpacingCm) + " cm spacing");
+    return;
+  }
+
+  if (command == "SEED_STOP") {
+    isAutoSowing = false;
+    autoSowState = SOW_IDLE;
+    stopMotors();
+    hopperCenter();
+    Serial.println("AUTOSOW -> Stopped. Total seeds sown: " + String(seedCount));
+    return;
+  }
+
   // Speed Command
   if (command.startsWith("SPEED:")) {
     int spd = command.substring(6).toInt();
@@ -317,12 +370,12 @@ void processCommand(String command) {
     return;
   }
 
-  // Movements (W, S, A, D)
-  if (command == "FORWARD") { moveForward(); return; }
-  if (command == "BACKWARD") { moveBackward(); return; }
-  if (command == "LEFT") { rotateLeft(); return; }
-  if (command == "RIGHT") { rotateRight(); return; }
-  if (command == "STOP") { stopMotors(); return; }
+  // Movements (W, S, A, D) - Immediately cancels auto-sowing if user manually drives
+  if (command == "FORWARD") { isAutoSowing = false; moveForward(); return; }
+  if (command == "BACKWARD") { isAutoSowing = false; moveBackward(); return; }
+  if (command == "LEFT") { isAutoSowing = false; rotateLeft(); return; }
+  if (command == "RIGHT") { isAutoSowing = false; rotateRight(); return; }
+  if (command == "STOP") { isAutoSowing = false; stopMotors(); return; }
   if (command == "ESTOP") { allActuatorsStop(); return; }
   
   // Actuator
@@ -391,6 +444,7 @@ void setup() {
   allActuatorsStop();
   Serial.println("==================================================");
   Serial.println("MACHINIST READY: W=FORWARD, S=BACK, A=LEFT, D=RIGHT");
+  Serial.println("CROP DISTANCE AUTONOMOUS SEEDING ENABLED");
   Serial.println("==================================================");
 }
 
@@ -419,7 +473,57 @@ void loop() {
     }
   }
 
-  // 3. High-Speed Multi-Seeding Sequence: 0 -> +45° -> 0 -> -45° -> 0
+  // 3. Crop-Specific Autonomous Step-and-Sow Sequence
+  if (isAutoSowing) {
+    uint32_t elapsed = millis() - sowStateStartTime;
+
+    if (autoSowState == SOW_MOVE) {
+      int32_t pulsesMoved = (abs(pulsesLeft - startLeftPulses) + abs(pulsesRight - startRightPulses)) / 2;
+      int32_t targetPulses = (int32_t)(targetSpacingCm * ENCODER_PULSES_PER_CM);
+      uint32_t targetTimeMs = (uint32_t)(targetSpacingCm * DRIVE_MS_PER_CM);
+
+      // Distance reached by encoder or time limit fallback
+      if ((pulsesMoved >= targetPulses && targetPulses > 2) || elapsed >= targetTimeMs) {
+        stopMotors();
+        autoSowState = SOW_STOP_SETTLE;
+        sowStateStartTime = millis();
+        Serial.println("AUTOSOW -> Seed point #" + String(seedCount + 1) + " reached (" + String(targetSpacingCm) + " cm)");
+      }
+    }
+    else if (autoSowState == SOW_STOP_SETTLE) {
+      if (elapsed >= 80) { // 80ms motor inertia settle
+        if (!alternateSide) {
+          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_LEFT_ANGLE); // +45 deg Left
+        } else {
+          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_RIGHT_ANGLE); // -45 deg Right
+        }
+        alternateSide = !alternateSide;
+        autoSowState = SOW_DISPENSE;
+        sowStateStartTime = millis();
+        Serial.println("AUTOSOW -> Dispensing seed #" + String(seedCount + 1));
+      }
+    }
+    else if (autoSowState == SOW_DISPENSE) {
+      if (elapsed >= 120) { // 120ms dispense open time
+        writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_CENTER_ANGLE); // Return to 0 deg Center
+        autoSowState = SOW_RETURN_CENTER;
+        sowStateStartTime = millis();
+      }
+    }
+    else if (autoSowState == SOW_RETURN_CENTER) {
+      if (elapsed >= 80) { // 80ms return settle time
+        seedCount++;
+        autoSowState = SOW_MOVE;
+        startLeftPulses = pulsesLeft;
+        startRightPulses = pulsesRight;
+        sowStateStartTime = millis();
+        moveForward();
+        Serial.println("AUTOSOW -> Advancing to next " + String(targetSpacingCm) + " cm seed position");
+      }
+    }
+  }
+
+  // 4. High-Speed Multi-Seeding Sequence: 0 -> +45° -> 0 -> -45° -> 0
   if (isMultiSeeding && (millis() - lastSeedStep >= SEED_STEP_DELAY)) {
     lastSeedStep = millis();
     if (multiSeedState == 0) {
@@ -437,7 +541,7 @@ void loop() {
     }
   }
 
-  // 4. Encoder telemetry
+  // 5. Encoder telemetry
   if (millis() - lastEncoderPrint >= 1000) {
     lastEncoderPrint = millis();
     Serial.println("L_ENC: " + String(pulsesLeft) + " | R_ENC: " + String(pulsesRight));

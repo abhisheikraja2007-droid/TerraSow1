@@ -178,6 +178,11 @@ app.post('/api/rover/command', async (req, res) => {
   // Update server state mirror
   if (command.startsWith('SPEED:')) {
     esp32Status.roverSpeed = parseInt(command.replace('SPEED:', ''), 10) || 255;
+  } else if (command.startsWith('SEED_RUN:')) {
+    vehicleState.armed = true;
+    vehicleState.mode = 'AUTO';
+  } else if (command === 'SEED_STOP') {
+    vehicleState.mode = 'MANUAL';
   } else if (command === 'DRILL_ON') esp32Status.drillOn = true;
   else if (command === 'DRILL_OFF') esp32Status.drillOn = false;
   else if (command === 'HOPPER_LEFT') esp32Status.hopperOpen = true;

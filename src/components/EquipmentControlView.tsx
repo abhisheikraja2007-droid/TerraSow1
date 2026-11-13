@@ -42,6 +42,21 @@ interface EquipmentControlViewProps {
   }) => void;
 }
 
+export const getCropDefaultSpacing = (crop: CropProfile): number => {
+  if (crop.seedSpacing) {
+    const matches = crop.seedSpacing.match(/(\d+(?:\.\d+)?)/g);
+    if (matches && matches.length > 0) {
+      if (matches.length >= 2) {
+        const val1 = parseFloat(matches[0]);
+        const val2 = parseFloat(matches[1]);
+        return Math.round(((val1 + val2) / 2) * 10) / 10;
+      }
+      return parseFloat(matches[0]);
+    }
+  }
+  return 18.0;
+};
+
 export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
   equipmentState,
   onUpdateEquipment,
@@ -273,6 +288,8 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       hapticSuccess();
       void MissionPlannerService.setArmed(true);
       void MissionPlannerService.setMode('AUTO');
+      // Transmit the exact crop distance to the ESP32!
+      void MissionPlannerService.sendRoverCommand(`SEED_RUN:${Math.round(spacingSetting)}`);
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: true,
@@ -283,6 +300,8 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       hapticMedium();
       void MissionPlannerService.setArmed(false);
       void MissionPlannerService.setMode('MANUAL');
+      void MissionPlannerService.sendRoverCommand('SEED_STOP');
+      void MissionPlannerService.sendRoverCommand('STOP');
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: false,
@@ -309,9 +328,13 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     if (found) {
       playClickSound();
       onSelectCrop(found);
+      const cropSpacing = getCropDefaultSpacing(found);
+      setSpacingSetting(cropSpacing);
       onUpdateEquipment((prev) => ({
         ...prev,
         activeCropId: found.id,
+        targetSpacingCm: cropSpacing,
+        actualSpacingCm: cropSpacing,
       }));
     }
   };
@@ -796,11 +819,22 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
               <>
                 <Play className="w-6 h-6 fill-current" />
                 <span className="text-[18px] font-black tracking-wider uppercase font-['Public_Sans']">
-                  START
+                  START AUTO-SEEDING
                 </span>
               </>
             )}
           </button>
+
+          {/* Live Crop Distance Indicator */}
+          <div className="flex items-center justify-between text-xs font-bold bg-[#f7f9ff] px-3 py-2 rounded-xl border border-gray-300">
+            <span className="text-gray-600 flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: selectedCrop.seedColor }} />
+              <strong>{selectedCrop.name}:</strong>
+            </span>
+            <span className="font-mono text-[#012d1d] font-black">
+              Step Distance: {spacingSetting.toFixed(1)} cm / seed
+            </span>
+          </div>
         </section>
       </div>
 
