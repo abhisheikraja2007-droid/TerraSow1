@@ -170,29 +170,56 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     }));
   }, [onUpdateEquipment, speedSetting]);
 
-  // Keyboard navigation support
+  // Keyboard navigation support with debounce & repeat filtering
   useEffect(() => {
+    const isEditingInput = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'KeyW'].includes(e.code)) {
+      if (isEditingInput(e)) return;
+      if (e.repeat) return; // Prevent flooding fetch requests on held key!
+
+      const code = e.code;
+      const key = e.key.toLowerCase();
+
+      // [W] / ArrowUp -> FORWARD
+      if (code === 'KeyW' || key === 'w' || code === 'ArrowUp') {
         e.preventDefault();
         handleDirectionPress('forward');
-      } else if (['ArrowDown', 'KeyS'].includes(e.code)) {
+      }
+      // [S] / ArrowDown -> BACKWARD
+      else if (code === 'KeyS' || key === 's' || code === 'ArrowDown') {
         e.preventDefault();
         handleDirectionPress('backward');
-      } else if (['ArrowLeft', 'KeyA'].includes(e.code)) {
+      }
+      // [A] / ArrowLeft -> ROTATE LEFT
+      else if (code === 'KeyA' || key === 'a' || code === 'ArrowLeft') {
         e.preventDefault();
         handleDirectionPress('left');
-      } else if (['ArrowRight', 'KeyD'].includes(e.code)) {
+      }
+      // [D] / ArrowRight -> ROTATE RIGHT
+      else if (code === 'KeyD' || key === 'd' || code === 'ArrowRight') {
         e.preventDefault();
         handleDirectionPress('right');
-      } else if (e.code === 'Space') {
+      }
+      // [Space] -> STOP
+      else if (code === 'Space' || key === ' ') {
         e.preventDefault();
         handleEmergencyStop();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'KeyW', 'ArrowDown', 'KeyS', 'ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(e.code)) {
+      if (isEditingInput(e)) return;
+      const code = e.code;
+      const key = e.key.toLowerCase();
+
+      if (
+        ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code) ||
+        ['w', 's', 'a', 'd'].includes(key)
+      ) {
         handleDirectionRelease();
       }
     };
