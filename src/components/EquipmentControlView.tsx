@@ -57,7 +57,7 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
 
   // ESP32 Rover Mechanism States
   const [drillActive, setDrillActive] = useState(false);
-  const [hopperSweepActive, setHopperSweepActive] = useState(false);
+  const [hopperMode, setHopperMode] = useState<'CENTER' | 'LEFT' | 'RIGHT' | 'MULTI'>('CENTER');
   const [actuatorState, setActuatorState] = useState<'STOP' | 'DOWN' | 'UP'>('STOP');
   const [npkState, setNpkState] = useState<'UP' | 'DOWN'>('UP');
   const [motorPwmSpeed, setMotorPwmSpeed] = useState(255);
@@ -70,12 +70,17 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     await MissionPlannerService.sendRoverCommand(next ? 'DRILL_ON' : 'DRILL_OFF');
   };
 
-  const handleToggleHopperSweep = async () => {
+  const handleHopperAction = async (mode: 'CENTER' | 'LEFT' | 'RIGHT' | 'MULTI') => {
     playClickSound();
     hapticMedium();
-    const next = !hopperSweepActive;
-    setHopperSweepActive(next);
-    await MissionPlannerService.sendRoverCommand(next ? 'HOPPER_SWEEP_START' : 'HOPPER_SWEEP_STOP');
+    setHopperMode(mode);
+    const cmdMap: Record<string, string> = {
+      CENTER: 'HOPPER_CENTER',
+      LEFT: 'HOPPER_LEFT',
+      RIGHT: 'HOPPER_RIGHT',
+      MULTI: 'HOPPER_MULTI_START',
+    };
+    await MissionPlannerService.sendRoverCommand(cmdMap[mode]);
   };
 
   const handleActuatorCommand = async (action: 'ACT_DOWN' | 'ACT_UP' | 'ACT_STOP') => {
@@ -206,7 +211,7 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     hapticWarning();
     void MissionPlannerService.sendRoverCommand('ESTOP');
     setDrillActive(false);
-    setHopperSweepActive(false);
+    setHopperMode('CENTER');
     setActuatorState('STOP');
     void MissionPlannerService.setArmed(false);
     void MissionPlannerService.setMode('HOLD');
@@ -523,30 +528,52 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
             </div>
           </div>
 
-          {/* 45° Hopper Sweep */}
-          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
-            <span className="font-extrabold text-gray-800 flex items-center gap-1">
-              <RotateCw className="w-3.5 h-3.5 text-blue-600" /> 45° Hopper Sweep
-            </span>
-            <div className="grid grid-cols-2 gap-1.5">
+          {/* Hopper Servo (0° to ±45° Dual-Side Seeding) */}
+          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200 col-span-2">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-gray-800 flex items-center gap-1 text-xs">
+                <RotateCw className="w-3.5 h-3.5 text-blue-600" /> Precision Hopper Seeder (0° to ±45°)
+              </span>
+              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
+                {hopperMode === 'LEFT' ? '+45° (LEFT)' : hopperMode === 'RIGHT' ? '-45° (RIGHT)' : hopperMode === 'MULTI' ? 'MULTI-SEED' : '0° (CENTER)'}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 text-xs">
               <button
                 type="button"
-                onClick={handleToggleHopperSweep}
+                onClick={() => handleHopperAction('LEFT')}
                 className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
-                  hopperSweepActive ? 'bg-blue-600 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  hopperMode === 'LEFT' ? 'bg-blue-600 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {hopperSweepActive ? 'SWEEPING' : 'SWEEP 45°'}
+                LEFT +45°
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setHopperSweepActive(false);
-                  void MissionPlannerService.sendRoverCommand('HOPPER_SWEEP_STOP');
-                }}
-                className="py-2 px-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-center cursor-pointer"
+                onClick={() => handleHopperAction('CENTER')}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                  hopperMode === 'CENTER' ? 'bg-gray-800 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
-                CENTER
+                CENTER 0°
+              </button>
+              <button
+                type="button"
+                onClick={() => handleHopperAction('RIGHT')}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                  hopperMode === 'RIGHT' ? 'bg-blue-600 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                RIGHT -45°
+              </button>
+              <button
+                type="button"
+                onClick={() => handleHopperAction('MULTI')}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                  hopperMode === 'MULTI' ? 'bg-emerald-600 text-white animate-pulse shadow-xs' : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                }`}
+              >
+                MULTI ±45°
               </button>
             </div>
           </div>

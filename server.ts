@@ -90,7 +90,7 @@ let esp32Status = {
   lastSeen: null as string | null,
   roverSpeed: 255,
   drillOn: false,
-  hopperSweep: false,
+  hopperOpen: false,
   actuatorState: 'STOP',
   npkState: 'UP',
   lastCommand: '',
@@ -180,8 +180,12 @@ app.post('/api/rover/command', async (req, res) => {
     esp32Status.roverSpeed = parseInt(command.replace('SPEED:', ''), 10) || 255;
   } else if (command === 'DRILL_ON') esp32Status.drillOn = true;
   else if (command === 'DRILL_OFF') esp32Status.drillOn = false;
-  else if (command === 'HOPPER_SWEEP_START') esp32Status.hopperSweep = true;
-  else if (command === 'HOPPER_SWEEP_STOP') esp32Status.hopperSweep = false;
+  else if (command === 'HOPPER_LEFT') esp32Status.hopperOpen = true;
+  else if (command === 'HOPPER_RIGHT') esp32Status.hopperOpen = true;
+  else if (command === 'HOPPER_CENTER' || command === 'HOPPER_CLOSE') esp32Status.hopperOpen = false;
+  else if (command === 'HOPPER_MULTI_START') esp32Status.hopperOpen = true;
+  else if (command === 'HOPPER_MULTI_STOP') esp32Status.hopperOpen = false;
+  else if (command === 'HOPPER_OPEN') esp32Status.hopperOpen = true;
   else if (command === 'ACT_DOWN') esp32Status.actuatorState = 'DOWN';
   else if (command === 'ACT_UP') esp32Status.actuatorState = 'UP';
   else if (command === 'ACT_STOP') esp32Status.actuatorState = 'STOP';
@@ -189,7 +193,7 @@ app.post('/api/rover/command', async (req, res) => {
   else if (command === 'NPK_UP') esp32Status.npkState = 'UP';
   else if (command === 'ESTOP') {
     esp32Status.drillOn = false;
-    esp32Status.hopperSweep = false;
+    esp32Status.hopperOpen = false;
     esp32Status.actuatorState = 'STOP';
     vehicleState.armed = false;
     vehicleState.mode = 'HOLD';
