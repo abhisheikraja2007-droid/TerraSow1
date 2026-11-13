@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   Sliders,
   Sparkles,
+  Zap,
+  RotateCw,
 } from 'lucide-react';
 import { CropProfile, EquipmentState } from '../types';
 import { CROPS_DATA } from '../data/cropsData';
+import { MissionPlannerService } from '../services/missionPlannerApi';
 import { playClickSound, playBeepSound, playEmergencyStopSound } from '../utils/audio';
 import {
   hapticLight,
@@ -52,6 +55,50 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
   const [depthSetting, setDepthSetting] = useState(4.0);
   const [spacingSetting, setSpacingSetting] = useState(equipmentState.targetSpacingCm || 18.0);
 
+  // ESP32 Rover Mechanism States
+  const [drillActive, setDrillActive] = useState(false);
+  const [hopperSweepActive, setHopperSweepActive] = useState(false);
+  const [actuatorState, setActuatorState] = useState<'STOP' | 'DOWN' | 'UP'>('STOP');
+  const [npkState, setNpkState] = useState<'UP' | 'DOWN'>('UP');
+  const [motorPwmSpeed, setMotorPwmSpeed] = useState(255);
+
+  const handleToggleDrill = async () => {
+    playClickSound();
+    hapticMedium();
+    const next = !drillActive;
+    setDrillActive(next);
+    await MissionPlannerService.sendRoverCommand(next ? 'DRILL_ON' : 'DRILL_OFF');
+  };
+
+  const handleToggleHopperSweep = async () => {
+    playClickSound();
+    hapticMedium();
+    const next = !hopperSweepActive;
+    setHopperSweepActive(next);
+    await MissionPlannerService.sendRoverCommand(next ? 'HOPPER_SWEEP_START' : 'HOPPER_SWEEP_STOP');
+  };
+
+  const handleActuatorCommand = async (action: 'ACT_DOWN' | 'ACT_UP' | 'ACT_STOP') => {
+    playClickSound();
+    hapticMedium();
+    setActuatorState(action === 'ACT_DOWN' ? 'DOWN' : action === 'ACT_UP' ? 'UP' : 'STOP');
+    await MissionPlannerService.sendRoverCommand(action);
+  };
+
+  const handleToggleNpk = async () => {
+    playClickSound();
+    hapticMedium();
+    const next = npkState === 'UP' ? 'DOWN' : 'UP';
+    setNpkState(next);
+    await MissionPlannerService.sendRoverCommand(next === 'DOWN' ? 'NPK_DOWN' : 'NPK_UP');
+  };
+
+  const handlePwmSpeedChange = async (val: number) => {
+    const clamped = Math.max(80, Math.min(255, val));
+    setMotorPwmSpeed(clamped);
+    await MissionPlannerService.sendRoverCommand(`SPEED:${clamped}`);
+  };
+
   // Keep spacing setting in sync with equipmentState
   useEffect(() => {
     if (equipmentState.targetSpacingCm) {
@@ -80,6 +127,17 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       playClickSound();
       hapticMedium();
       setActiveDirectionKey(dir);
+
+      const cmdMap: Record<string, string> = {
+        forward: 'FORWARD',
+        backward: 'BACKWARD',
+        left: 'LEFT',
+        right: 'RIGHT',
+      };
+      if (cmdMap[dir]) {
+        void MissionPlannerService.sendRoverCommand(cmdMap[dir]);
+      }
+
       onUpdateEquipment((prev) => {
         let steering = prev.steeringAngleDeg;
         if (dir === 'left') steering = Math.max(-30, steering - 10);
@@ -99,6 +157,7 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
 
   const handleDirectionRelease = useCallback(() => {
     setActiveDirectionKey(null);
+    void MissionPlannerService.sendRoverCommand('STOP');
     onUpdateEquipment((prev) => ({
       ...prev,
       activeDirection: 'idle',
@@ -145,6 +204,12 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
   const handleEmergencyStop = () => {
     playEmergencyStopSound();
     hapticWarning();
+    void MissionPlannerService.sendRoverCommand('ESTOP');
+    setDrillActive(false);
+    setHopperSweepActive(false);
+    setActuatorState('STOP');
+    void MissionPlannerService.setArmed(false);
+    void MissionPlannerService.setMode('HOLD');
     onUpdateEquipment((prev) => ({
       ...prev,
       isRunning: false,
@@ -154,10 +219,10 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     }));
   };
 
-  // Reset Emergency Stop
   const handleResetEmergency = () => {
     playBeepSound(440, 0.1);
     hapticLight();
+    void MissionPlannerService.setMode('MANUAL');
     onUpdateEquipment((prev) => ({
       ...prev,
       isEmergencyStopped: false,
@@ -165,7 +230,6 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     }));
   };
 
-  // Run / Pause Equipment Toggle
   const handleToggleRun = () => {
     if (equipmentState.isEmergencyStopped) {
       handleResetEmergency();
@@ -175,6 +239,8 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     playBeepSound(equipmentState.isRunning ? 500 : 880, 0.15);
     if (!equipmentState.isRunning) {
       hapticSuccess();
+      void MissionPlannerService.setArmed(true);
+      void MissionPlannerService.setMode('AUTO');
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: true,
@@ -183,7 +249,8 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       }));
     } else {
       hapticMedium();
-      // Pause
+      void MissionPlannerService.setArmed(false);
+      void MissionPlannerService.setMode('MANUAL');
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: false,
@@ -393,6 +460,167 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* ESP32 Hardware Mechanisms Card (Machinist & Navigator Direct Controls) */}
+      <div className="bg-white border-2 border-[#0A0A0A] rounded-2xl p-4 shadow-sm flex flex-col gap-3.5">
+        <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h3 className="text-[15px] font-extrabold text-[#0A0A0A] uppercase tracking-wide font-['Public_Sans']">
+              Rover Hardware & Tools
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-300">
+            ESP32 UART / HTTP
+          </span>
+        </div>
+
+        {/* Speed Slider (PWM 80-255) */}
+        <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="flex justify-between items-center text-xs font-bold">
+            <span className="text-gray-700 flex items-center gap-1">
+              <Gauge className="w-3.5 h-3.5 text-[#2D6A4F]" /> Motor Speed PWM:
+            </span>
+            <span className="font-mono text-emerald-800 font-extrabold">{motorPwmSpeed} / 255</span>
+          </div>
+          <input
+            type="range"
+            min="80"
+            max="255"
+            value={motorPwmSpeed}
+            onChange={(e) => handlePwmSpeedChange(parseInt(e.target.value, 10))}
+            className="w-full h-2 bg-gray-300 rounded appearance-none cursor-pointer accent-[#2D6A4F]"
+          />
+        </div>
+
+        {/* Tool Action Grid */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {/* Seed Drill */}
+          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="font-extrabold text-gray-800 flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-amber-600" /> Seed Drill Motor
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={handleToggleDrill}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                  drillActive ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {drillActive ? 'DRILL ON' : 'START'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrillActive(false);
+                  void MissionPlannerService.sendRoverCommand('DRILL_OFF');
+                }}
+                className="py-2 px-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-center cursor-pointer"
+              >
+                STOP
+              </button>
+            </div>
+          </div>
+
+          {/* 45° Hopper Sweep */}
+          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="font-extrabold text-gray-800 flex items-center gap-1">
+              <RotateCw className="w-3.5 h-3.5 text-blue-600" /> 45° Hopper Sweep
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={handleToggleHopperSweep}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer transition-all ${
+                  hopperSweepActive ? 'bg-blue-600 text-white shadow-xs' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {hopperSweepActive ? 'SWEEPING' : 'SWEEP 45°'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHopperSweepActive(false);
+                  void MissionPlannerService.sendRoverCommand('HOPPER_SWEEP_STOP');
+                }}
+                className="py-2 px-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-center cursor-pointer"
+              >
+                CENTER
+              </button>
+            </div>
+          </div>
+
+          {/* Depth Linear Actuator */}
+          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="font-extrabold text-gray-800 flex items-center justify-between">
+              <span>Depth Actuator</span>
+              <span className="font-mono text-[10px] text-gray-500">{actuatorState}</span>
+            </span>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                onClick={() => handleActuatorCommand('ACT_DOWN')}
+                className={`py-1.5 rounded-lg font-bold text-[11px] cursor-pointer ${
+                  actuatorState === 'DOWN' ? 'bg-emerald-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                DOWN
+              </button>
+              <button
+                type="button"
+                onClick={() => handleActuatorCommand('ACT_STOP')}
+                className="py-1.5 rounded-lg font-bold text-[11px] bg-red-100 text-red-800 hover:bg-red-200 cursor-pointer"
+              >
+                HOLD
+              </button>
+              <button
+                type="button"
+                onClick={() => handleActuatorCommand('ACT_UP')}
+                className={`py-1.5 rounded-lg font-bold text-[11px] cursor-pointer ${
+                  actuatorState === 'UP' ? 'bg-emerald-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                UP
+              </button>
+            </div>
+          </div>
+
+          {/* NPK Fertilizer Servo */}
+          <div className="flex flex-col gap-1.5 p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+            <span className="font-extrabold text-gray-800 flex items-center justify-between">
+              <span>NPK Dispenser</span>
+              <span className="font-mono text-[10px] text-gray-500">{npkState}</span>
+            </span>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setNpkState('DOWN');
+                  void MissionPlannerService.sendRoverCommand('NPK_DOWN');
+                }}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer ${
+                  npkState === 'DOWN' ? 'bg-purple-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                DEPLOY
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNpkState('UP');
+                  void MissionPlannerService.sendRoverCommand('NPK_UP');
+                }}
+                className={`py-2 px-1 rounded-lg font-bold text-center cursor-pointer ${
+                  npkState === 'UP' ? 'bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                RETRACT
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Preparation Container (Step 1 & Step 2) */}
       <div className="bg-white border-2 border-[#0A0A0A] rounded-2xl p-4 shadow-sm flex flex-col gap-4">

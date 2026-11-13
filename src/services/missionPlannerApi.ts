@@ -120,4 +120,46 @@ export class MissionPlannerService {
       return { success: false, message: 'RTL trigger failed' };
     }
   }
+
+  // 8. Rover Hardware Direct Commands (ESP32 Machinist & Navigator)
+  public static async sendRoverCommand(
+    command: string
+  ): Promise<{ success: boolean; message: string; status?: any }> {
+    try {
+      const res = await fetch('/api/rover/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command }),
+      });
+      return await res.json();
+    } catch (err) {
+      console.warn('Rover command error:', err);
+      return { success: false, message: 'Rover communication offline' };
+    }
+  }
+
+  // 9. Get Live ESP32 Hardware Status
+  public static async getRoverStatus(): Promise<any> {
+    try {
+      const res = await fetch('/api/rover/status');
+      return await res.json();
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // 10. Set ESP32 Rover Host / IP
+  public static async setRoverHost(host: string): Promise<boolean> {
+    try {
+      const res = await fetch('/api/rover/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host }),
+      });
+      const data = await res.json();
+      return !!data.success;
+    } catch (err) {
+      return false;
+    }
+  }
 }

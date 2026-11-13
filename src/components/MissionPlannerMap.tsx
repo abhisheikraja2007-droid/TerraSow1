@@ -273,8 +273,9 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       });
     }
 
-    // 3. Draw Swath Ribbons & Connecting Paths
-    const swathOffsetDeg = (swathWidthMeters / 2) * 0.0000105;
+    // 3. Draw Swath Ribbons & Connecting Paths (Exact Perpendicular Normal Vector)
+    const R = 6378137;
+    const halfWidthM = swathWidthMeters / 2;
 
     for (let i = 1; i < waypoints.length; i++) {
       const prev = waypoints[i - 1];
@@ -282,20 +283,31 @@ export const MissionPlannerMap: React.FC<MissionPlannerMapProps> = ({
       const isSeeding = curr.seederActive || prev.seederActive;
 
       if (isSeeding) {
-        // Draw Swath Coverage Rectangle Band
-        const swathPolygon = [
-          [prev.lat, prev.lng - swathOffsetDeg],
-          [prev.lat, prev.lng + swathOffsetDeg],
-          [curr.lat, curr.lng + swathOffsetDeg],
-          [curr.lat, curr.lng - swathOffsetDeg],
-        ] as [number, number][];
+        const meanLatRad = ((prev.lat + curr.lat) / 2) * (Math.PI / 180);
+        const dy = (curr.lat - prev.lat) * (Math.PI / 180) * R;
+        const dx = (curr.lng - prev.lng) * (Math.PI / 180) * Math.cos(meanLatRad) * R;
+        const segLen = Math.hypot(dx, dy);
 
-        L.polygon(swathPolygon, {
-          color: '#22c55e',
-          weight: 1,
-          fillColor: '#4ade80',
-          fillOpacity: 0.35,
-        }).addTo(layerGroup);
+        if (segLen > 0.001) {
+          const nx = -dy / segLen;
+          const ny = dx / segLen;
+          const offLatDeg = (ny * halfWidthM / R) * (180 / Math.PI);
+          const offLngDeg = (nx * halfWidthM / (R * Math.cos(meanLatRad))) * (180 / Math.PI);
+
+          const swathPolygon = [
+            [prev.lat + offLatDeg, prev.lng + offLngDeg],
+            [prev.lat - offLatDeg, prev.lng - offLngDeg],
+            [curr.lat - offLatDeg, curr.lng - offLngDeg],
+            [curr.lat + offLatDeg, curr.lng + offLngDeg],
+          ] as [number, number][];
+
+          L.polygon(swathPolygon, {
+            color: '#22c55e',
+            weight: 1,
+            fillColor: '#4ade80',
+            fillOpacity: 0.35,
+          }).addTo(layerGroup);
+        }
 
         // Center centerline
         L.polyline(
