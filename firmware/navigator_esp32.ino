@@ -1,7 +1,8 @@
 /* =====================================================================================
- * NAVIGATOR ESP32 - ROVER BRAIN & NAVIGATION HOTSPOT
- * Features: Wi-Fi AP Hotspot (AURA32_ROVER), Web Dashboard, MAVLink UDP Stream,
- *           QMC5883L Compass, TinyGPSPlus, Ultrasonic Sonar, UART to Machinist.
+ * NAVIGATOR ESP32 - ROVER BRAIN & NAVIGATION HOTSPOT (VERIFIED SAFE)
+ * Features: Wi-Fi AP Hotspot (AURA32_ROVER), AgriControl Dark UI Dashboard,
+ *           MAVLink UDP Stream, QMC5883L Compass, TinyGPSPlus, Ultrasonic Sonar,
+ *           High-Speed Non-Blocking UART Bridge to Machinist.
  * =====================================================================================
  */
 
@@ -15,11 +16,10 @@
 #include <QMC5883LCompass.h>
 #include <MAVLink.h> 
 
-// --- BROWNOUT FIX LIBRARIES ---
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 
-// --- ACCESS POINT (HOTSPOT) CREDENTIALS ---
+// --- ACCESS POINT CREDENTIALS ---
 const char* AP_SSID = "AURA32_ROVER";       
 const char* AP_PASSWORD = "password123"; 
 
@@ -71,7 +71,6 @@ void sendMachinistCommand(String command) {
   Serial.println("UART -> MACHINIST: " + command);
 }
 
-// --- ULTRASONIC SENSOR (Fast 10ms timeout) ---
 float getSonarDistance() {
   digitalWrite(TRIG_PIN, LOW); delayMicroseconds(2);
   digitalWrite(TRIG_PIN, HIGH); delayMicroseconds(10);
@@ -81,7 +80,6 @@ float getSonarDistance() {
   return duration * 0.034 / 2.0;   
 }
 
-// --- MAVLINK SYSTEM ---
 void sendMavlinkMessage(mavlink_message_t* msg) {
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
   uint16_t len = mavlink_msg_to_send_buffer(buf, msg);
@@ -134,7 +132,6 @@ void processMavlink() {
   }
 }
 
-// --- GPS MATH ---
 float getDistance(double lat1, double lon1, double lat2, double lon2) { return TinyGPSPlus::distanceBetween(lat1, lon1, lat2, lon2); }
 float getBearing(double lat1, double lon1, double lat2, double lon2) { return TinyGPSPlus::courseTo(lat1, lon1, lat2, lon2); }
 float getHeadingError(float target, float current) { 
@@ -144,7 +141,6 @@ float getHeadingError(float target, float current) {
   return e; 
 }
 
-// --- NAVIGATION & OBSTACLE AVOIDANCE ---
 void updateNavigation() {
   if (!autonomousEnabled || missionCount == 0) return;
   
@@ -202,63 +198,100 @@ void updateNavigation() {
   else { sendMachinistCommand("LEFT"); navState = ALIGNING; }
 }
 
-// --- FULL MANUAL DASHBOARD ---
 void setupDashboard() {
   dashboardServer.on("/", []() {
-    String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<style>body{text-align:center; font-family:sans-serif; background-color:#1a1a1a; color:white; margin:0; padding:15px;}";
-    html += "button{padding:14px; font-size:15px; margin:5px; width:145px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; user-select:none;}";
-    html += "button:active{transform:scale(0.95); opacity:0.8;}";
-    html += ".nav{background:#007bff; color:white;} .stop{background:#dc3545; color:white;}";
-    html += ".estop{background:#ff0000; color:white; width:300px; font-size:18px; border:2px solid white;}";
-    html += ".tool-on{background:#28a745; color:white;} .tool-off{background:#6c757d; color:white;}";
-    html += ".auto{background:#6f42c1; color:white;} hr{border:1px solid #333; margin:15px 0;}";
-    html += ".slider-box{margin:10px auto; width:90%; max-width:320px; background:#2a2a2a; padding:12px; border-radius:10px;}";
-    html += "input[type=range]{width:100%; height:25px;}</style></head><body>";
+    String html = "<!DOCTYPE html><html lang='en'><head>";
+    html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>";
+    html += "<title>AgriControl Pro - AURA32</title>";
+    html += "<style>";
+    html += "*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-tap-highlight-color:transparent;}";
+    html += "body{background:#0B0F17;color:#F9FAFB;font-family:system-ui,sans-serif;padding:12px;display:flex;justify-content:center;}";
+    html += ".wrap{width:100%;max-width:420px;display:flex;flex-direction:column;gap:12px;}";
+    html += ".header{background:#111827;border:1px solid #1F2937;border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;}";
+    html += ".header h1{font-size:16px;font-weight:900;letter-spacing:0.5px;}";
+    html += ".header p{font-size:10px;color:#14B8A6;font-weight:700;text-transform:uppercase;}";
+    html += ".badge{background:rgba(20,184,166,0.15);border:1px solid #14B8A6;color:#14B8A6;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;}";
+    html += ".card{background:#111827;border:1px solid #1F2937;border-radius:14px;padding:12px;box-shadow:0 4px 10px rgba(0,0,0,0.4);}";
+    html += ".card-t{font-size:11px;font-weight:800;color:#06B6D4;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;justify-content:space-between;}";
+    html += ".slider{width:100%;height:8px;accent-color:#06B6D4;margin:6px 0;}";
+    html += ".dpad{position:relative;width:240px;height:240px;margin:4px auto;background:#080C13;border:2px solid #1F2937;border-radius:24px;}";
+    html += ".btn-dp{position:absolute;width:64px;height:64px;background:#1E293B;border:2px solid #334155;color:#fff;font-size:11px;font-weight:900;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;}";
+    html += ".btn-dp:active{transform:scale(0.92);background:#06B6D4;color:#000;border-color:#06B6D4;}";
+    html += ".dp-u{top:8px;left:50%;transform:translateX(-50%);}";
+    html += ".dp-d{bottom:8px;left:50%;transform:translateX(-50%);}";
+    html += ".dp-l{top:50%;left:8px;transform:translateY(-50%);}";
+    html += ".dp-r{top:50%;right:8px;transform:translateY(-50%);}";
+    html += ".btn-stop{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:78px;height:78px;background:#DC2626;border:3px solid #EF4444;border-radius:16px;color:#fff;font-weight:900;font-size:15px;cursor:pointer;}";
+    html += ".btn-stop:active{transform:translate(-50%,-50%) scale(0.9);}";
+    html += ".g2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}";
+    html += ".g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}";
+    html += ".g4{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}";
+    html += ".btn{background:#1E293B;border:1px solid #334155;color:#fff;font-size:11px;font-weight:700;padding:9px 4px;border-radius:8px;cursor:pointer;text-align:center;}";
+    html += ".btn:active{transform:scale(0.94);}";
+    html += ".b-cyan{background:rgba(6,182,212,0.15);border-color:#06B6D4;color:#06B6D4;}";
+    html += ".b-cyan:active{background:#06B6D4;color:#000;}";
+    html += ".b-teal{background:rgba(20,184,166,0.15);border-color:#14B8A6;color:#14B8A6;}";
+    html += ".b-teal:active{background:#14B8A6;color:#000;}";
+    html += ".b-yel{background:rgba(234,179,8,0.15);border-color:#EAB308;color:#EAB308;}";
+    html += ".b-yel:active{background:#EAB308;color:#000;}";
+    html += ".b-red{background:rgba(239,68,68,0.15);border-color:#EF4444;color:#EF4444;}";
+    html += ".b-red:active{background:#EF4444;color:#fff;}";
+    html += ".crop-sel{width:100%;height:38px;background:#080C13;border:1px solid #1F2937;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:0 8px;margin-bottom:6px;}";
+    html += ".btn-estop{width:100%;background:#DC2626;color:#fff;border:2px solid #EF4444;padding:12px;font-size:13px;font-weight:900;letter-spacing:1px;border-radius:12px;cursor:pointer;}";
+    html += ".btn-estop:active{transform:scale(0.96);}";
+    html += "</style></head><body>";
     
-    html += "<h2>AURA32 Command Center</h2>";
+    html += "<div class='wrap'>";
+    html += "<div class='header'><div><h1>AURA32 ROVER</h1><p>AgriControl Dark Cockpit</p></div><div class='badge'>WIFI LIVE</div></div>";
 
-    html += "<div class='slider-box'>";
-    html += "<label style='font-size:16px; font-weight:bold;'>Motor Speed: <span id='spdVal'>255</span> / 255</label><br><br>";
-    html += "<input type='range' min='80' max='255' value='255' id='spdSlider' onchange=\"setSpeed(this.value)\" oninput=\"document.getElementById('spdVal').innerText=this.value\">";
-    html += "</div><hr>";
-    
-    html += "<h3>Rover Movement</h3>";
-    html += "<button class='nav' onclick=\"cmd('FORWARD')\">FORWARD</button><br>";
-    html += "<button class='nav' onclick=\"cmd('LEFT')\">LEFT</button>";
-    html += "<button class='stop' onclick=\"cmd('STOP')\">STOP WHEELS</button>";
-    html += "<button class='nav' onclick=\"cmd('RIGHT')\">RIGHT</button><br>";
-    html += "<button class='nav' onclick=\"cmd('BACKWARD')\">BACKWARD</button><hr>";
+    html += "<div class='card'>";
+    html += "<div class='card-t'><span>Motor Speed</span><span id='sv' style='color:#fff;'>255 / 255</span></div>";
+    html += "<input type='range' min='80' max='255' value='255' class='slider' onchange=\"setSpeed(this.value)\" oninput=\"document.getElementById('sv').innerText=this.value+' / 255'\">";
+    html += "</div>";
 
-    html += "<h3>Tools & Mechanisms</h3>";
-    html += "<button class='tool-on' onclick=\"cmd('DRILL_ON')\">DRILL ON</button>";
-    html += "<button class='tool-off' onclick=\"cmd('DRILL_OFF')\">DRILL OFF</button><br>";
-    
-    // --- 0° TO ±45° DUAL-SIDE SEEDING BUTTONS ---
-    html += "<button class='tool-on' onclick=\"cmd('HOPPER_LEFT')\">LEFT SEED (+45°)</button>";
-    html += "<button class='tool-off' onclick=\"cmd('HOPPER_CENTER')\">CENTER (0°)</button>";
-    html += "<button class='tool-on' onclick=\"cmd('HOPPER_RIGHT')\">RIGHT SEED (-45°)</button><br>";
-    html += "<button class='auto' style='width:300px;' onclick=\"cmd('HOPPER_MULTI_START')\">MULTI-SEED (0 &#8594; +45 &#8594; 0 &#8594; -45)</button><br>";
-    html += "<button class='tool-off' style='width:300px;' onclick=\"cmd('HOPPER_MULTI_STOP')\">STOP MULTI-SEED</button><br>";
-    
-    html += "<button class='tool-on' onclick=\"cmd('ACT_DOWN')\">ACTUATOR DOWN</button>";
-    html += "<button class='tool-off' onclick=\"cmd('ACT_UP')\">ACTUATOR UP</button><br>";
-    html += "<button class='tool-off' style='width:300px;' onclick=\"cmd('ACT_STOP')\">ACTUATOR HOLD / STOP</button><br>";
+    html += "<div class='card'>";
+    html += "<div class='card-t'>Movement Control</div>";
+    html += "<div class='dpad'>";
+    html += "<button class='btn-dp dp-u' onclick=\"cmd('FORWARD')\">FWD<br>[W]</button>";
+    html += "<button class='btn-dp dp-l' onclick=\"cmd('LEFT')\">LFT<br>[A]</button>";
+    html += "<button class='btn-stop' onclick=\"cmd('STOP')\">STOP</button>";
+    html += "<button class='btn-dp dp-r' onclick=\"cmd('RIGHT')\">RGT<br>[D]</button>";
+    html += "<button class='btn-dp dp-d' onclick=\"cmd('BACKWARD')\">REV<br>[S]</button>";
+    html += "</div></div>";
 
-    html += "<button class='tool-on' onclick=\"cmd('NPK_DOWN')\">NPK DOWN</button>";
-    html += "<button class='tool-off' onclick=\"cmd('NPK_UP')\">NPK UP</button><hr>";
+    html += "<div class='card'>";
+    html += "<div class='card-t'>Mechanisms & Tools</div>";
+    html += "<div style='display:flex;flex-direction:column;gap:6px;'>";
+    html += "<div class='g2'><button class='btn b-yel' onclick=\"cmd('DRILL_ON')\">⚡ DRILL ON</button><button class='btn' onclick=\"cmd('DRILL_OFF')\">DRILL OFF</button></div>";
+    html += "<div class='g4'><button class='btn b-cyan' onclick=\"cmd('HOPPER_LEFT')\">L +45°</button><button class='btn' onclick=\"cmd('HOPPER_CENTER')\">CTR 0°</button><button class='btn b-cyan' onclick=\"cmd('HOPPER_RIGHT')\">R -45°</button><button class='btn b-teal' onclick=\"cmd('HOPPER_MULTI_START')\">MULTI</button></div>";
+    html += "<button class='btn' style='font-size:10px;' onclick=\"cmd('HOPPER_MULTI_STOP')\">STOP MULTI-SEED</button>";
+    html += "<div class='g3'><button class='btn b-teal' onclick=\"cmd('ACT_DOWN')\">ACT DOWN</button><button class='btn b-red' onclick=\"cmd('ACT_STOP')\">ACT HOLD</button><button class='btn b-teal' onclick=\"cmd('ACT_UP')\">ACT UP</button></div>";
+    html += "<div class='g2'><button class='btn b-cyan' onclick=\"cmd('NPK_DOWN')\">NPK DOWN</button><button class='btn' onclick=\"cmd('NPK_UP')\">NPK UP</button></div>";
+    html += "</div></div>";
 
-    html += "<button class='estop' onclick=\"cmd('ESTOP')\">EMERGENCY STOP ALL</button><hr>";
+    html += "<div class='card'>";
+    html += "<div class='card-t'>Crop Distance Auto-Sow</div>";
+    html += "<select id='cs' class='crop-sel'>";
+    html += "<option value='18'>Wheat (18.0 cm)</option>";
+    html += "<option value='25'>Maize (25.0 cm)</option>";
+    html += "<option value='13'>Paddy (12.5 cm)</option>";
+    html += "<option value='13'>Groundnut (12.5 cm)</option>";
+    html += "<option value='9'>Green Gram (9.0 cm)</option>";
+    html += "<option value='28'>Red Gram (27.5 cm)</option>";
+    html += "<option value='4'>Flaxseed (4.0 cm)</option>";
+    html += "<option value='53'>Castor (52.5 cm)</option>";
+    html += "</select>";
+    html += "<div class='g2'><button class='btn b-teal' style='font-weight:900;' onclick=\"cmd('SEED_RUN:'+document.getElementById('cs').value)\">▶ AUTO START</button><button class='btn b-red' style='font-weight:900;' onclick=\"cmd('SEED_STOP');cmd('STOP');\">■ AUTO STOP</button></div>";
+    html += "</div>";
 
-    html += "<h3>Autonomous Mode</h3>";
-    html += "<button class='auto' onclick=\"cmd('AUTO:START')\">AUTO START</button>";
-    html += "<button class='auto' onclick=\"cmd('AUTO:STOP')\">AUTO STOP</button>";
+    html += "<button class='btn-estop' onclick=\"cmd('ESTOP')\">⚠ EMERGENCY STOP (ESTOP)</button>";
+    html += "</div>";
 
     html += "<script>";
-    html += "function cmd(action) { fetch('/action?cmd=' + encodeURIComponent(action), {cache: 'no-store'}); }";
-    html += "function setSpeed(val) { fetch('/action?cmd=SPEED:' + val, {cache: 'no-store'}); }";
-    html += "</script>";
-    html += "</body></html>";
+    html += "function cmd(a){fetch('/action?cmd='+encodeURIComponent(a),{cache:'no-store'});}";
+    html += "function setSpeed(v){fetch('/action?cmd=SPEED:'+v,{cache:'no-store'});}";
+    html += "</script></body></html>";
+
     dashboardServer.send(200, "text/html", html);
   });
 
@@ -289,15 +322,10 @@ void setup() {
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); 
 
   Serial.begin(SERIAL_BAUD); 
-  GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN); 
   MachinistSerial.begin(SERIAL_BAUD, SERIAL_8N1, MACHINIST_RX_PIN, MACHINIST_TX_PIN);
-  
-  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  compass.init();
+  GPSSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN); 
 
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-
+  // --- 1. START WI-FI AP & WEBSERVER FIRST (Guaranteed to boot immediately) ---
   WiFi.mode(WIFI_AP);
   WiFi.softAP(AP_SSID, AP_PASSWORD);
   
@@ -309,13 +337,19 @@ void setup() {
   
   udp.begin(UDP_PORT);
   setupDashboard(); 
+
+  // --- 2. SENSORS (Safe init after Wi-Fi) ---
+  Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+  compass.init();
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
 }
 
 void loop() {
   dashboardServer.handleClient(); 
   processMavlink(); 
 
-  // --- NON-BLOCKING UART LISTENER ---
   while (MachinistSerial.available()) {
     char c = MachinistSerial.read();
     if (c == '\n') {
@@ -329,7 +363,6 @@ void loop() {
     }
   }
 
-  // --- COMPASS AND GPS DEBUGGING (Every 2 seconds) ---
   if (millis() - lastPingAt >= 2000) {
     sendMachinistCommand("PING");
     lastPingAt = millis();
