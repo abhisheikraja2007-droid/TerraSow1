@@ -2,22 +2,25 @@
  * MACHINIST ESP32 - PRECISION CALIBRATED MOVEMENT & HIGH-SPEED SERVO CONTROLLER
  * WITH TIME-BASED AUTONOMOUS STEP-AND-SOW DISTANCE ENGINE
  * =====================================================================================
- * MOVEMENT MAPPING:
- *   [W] FORWARD:  Both Left & Right wheels drive Forward together (Straight)
- *   [S] BACKWARD: Both Left & Right wheels drive Reverse together (Straight)
- *   [A] LEFT:     Left wheel reverses, Right wheel drives forward (Pivots Left)
- *   [D] RIGHT:    Left wheel drives forward, Right wheel reverses (Pivots Right)
- *   [STOP]:       Cuts motor PWM to 0 immediately
+ * MOVEMENT POLARITY (Calibrated to Physical Rover Wiring):
+ *   [W] FORWARD:      Left = HIGH, Right = LOW   (Drives Straight Forward)
+ *   [S] BACKWARD:     Left = LOW,  Right = HIGH  (Drives Straight Backward)
+ *   [A] ROTATE LEFT:  Left = LOW,  Right = LOW   (Left motor Rev, Right motor Fwd -> Pivots Left)
+ *   [D] ROTATE RIGHT: Left = HIGH, Right = HIGH  (Left motor Fwd, Right motor Rev -> Pivots Right)
+ *   [STOP]:           Cuts motor PWM to 0 immediately
  *
- * MOTOR PWM FREQUENCY:
- *   Set to 1000 Hz (1 kHz) for maximum starting torque and zero driver buzzing/whine.
+ * MOTOR PWM CONFIGURATION:
+ *   - 1000 Hz (1 kHz) for maximum low-end starting torque & zero driver buzzing/whine.
+ *   - Full 255 PWM duty cycle on roverSpeed and turnSpeed for maximum breakaway torque.
+ *   - 250ms anti-stiction pulse floor: ensures both Left & Right motors overcome static
+ *     friction even on brief UI button taps.
  *
  * TIME-BASED AUTONOMOUS STEP-AND-SOW:
  *   - Completely independent of encoders and GPS: works indoors, in mud, anywhere!
- *   - 1 cm = 45 ms drive time at roverSpeed (255)
- *     Wheat (18 cm)   = 810 ms drive -> stop & settle -> drop seed -> center -> repeat
- *     Maize (25 cm)   = 1125 ms drive -> stop & settle -> drop seed -> center -> repeat
- *     Paddy (12.5 cm) = 562 ms drive -> stop & settle -> drop seed -> center -> repeat
+ *   - 1 cm = 45 ms drive time at full speed (255)
+ *     Wheat (18 cm)   = 810 ms drive -> settle -> drill down -> drill up -> drop seed -> repeat
+ *     Maize (25 cm)   = 1125 ms drive -> settle -> drill down -> drill up -> drop seed -> repeat
+ *     Paddy (12.5 cm) = 562 ms drive -> settle -> drill down -> drill up -> drop seed -> repeat
  * =====================================================================================
  * PINOUT ASSIGNMENTS:
  *   Left Motor PWM:    Pin 4
@@ -53,44 +56,49 @@ const uint8_t LEFT_REV_DIR  = LOW;
 const uint8_t RIGHT_REV_DIR = HIGH;
 
 // --- SAFE ESP32 PINOUT ---
-const uint8_t LEFT_PWM_PIN = 4;
-const uint8_t LEFT_DIR_PIN = 5;
+const uint8_t LEFT_PWM_PIN  = 4;
+const uint8_t LEFT_DIR_PIN  = 5;
 const uint8_t RIGHT_PWM_PIN = 18; 
 const uint8_t RIGHT_DIR_PIN = 19; 
 
-const uint8_t ACT_EN_PIN = 23;    
+const uint8_t ACT_EN_PIN  = 23;    
 const uint8_t ACT_IN1_PIN = 25;   
 const uint8_t ACT_IN2_PIN = 26;   
 
-const uint8_t DRILL_EN_PIN = 27;  
+const uint8_t DRILL_EN_PIN  = 27;  
 const uint8_t DRILL_IN3_PIN = 32; 
 const uint8_t DRILL_IN4_PIN = 33; 
 
-const uint8_t HOPPER_PIN = 14; 
+const uint8_t HOPPER_PIN    = 14; 
 const uint8_t NPK_SERVO_PIN = 13; 
 
 const uint8_t NAV_RX_PIN = 16; 
 const uint8_t NAV_TX_PIN = 17; 
 
-const uint8_t ENCODER_LEFT_PIN = 21;  
+const uint8_t ENCODER_LEFT_PIN  = 21;  
 const uint8_t ENCODER_RIGHT_PIN = 22; 
 
 const uint32_t UART_BAUD = 115200;
 
 // 1 kHz PWM frequency delivers maximum motor torque with no driver buzz
-const uint32_t MOTOR_PWM_HZ = 1000; 
-const uint8_t MOTOR_PWM_BITS = 8;
+const uint32_t MOTOR_PWM_HZ   = 1000; 
+const uint8_t  MOTOR_PWM_BITS = 8;
 
-const uint32_t SERVO_PWM_HZ = 50;
-const uint8_t SERVO_PWM_BITS = 14;
+const uint32_t SERVO_PWM_HZ   = 50;
+const uint8_t  SERVO_PWM_BITS = 14;
 
 const uint8_t HOPPER_CH = 0;
 const uint8_t NPK_CH    = 1;
 const uint8_t LEFT_CH   = 2;
 const uint8_t RIGHT_CH  = 3;
 
+// Full 255 duty cycle ensures maximum breakaway torque for both motors
 uint8_t roverSpeed = 255; 
-uint8_t turnSpeed = 200; 
+uint8_t turnSpeed  = 255; 
+
+// Guaranteed minimum manual drive pulse (ms) to prevent quick touch taps from cutting PWM before stiction breaks
+const uint32_t MIN_DRIVE_PULSE_MS = 250;
+uint32_t lastManualDriveTime = 0;
 
 // --- 0° TO ±45° DUAL-SIDE SEEDING ---
 const int HOPPER_CENTER_ANGLE = 90;  // 0° reference (Neutral / Closed)
@@ -134,7 +142,8 @@ volatile int32_t pulsesRight = 0;
 uint32_t lastEncoderPrint = 0; 
 
 HardwareSerial NavigatorSerial(2);
-String rxLine = "";
+String navRxLine = "";
+String serialRxLine = "";
 
 void writeServoAngle(uint8_t pin, uint8_t channel, int angle) {
   angle = constrain(angle, 0, 180);
@@ -198,38 +207,44 @@ void stopMotors() {
 
 void moveForward() { 
   currentDrive = DRIVE_FWD;
-  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR); 
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); 
+  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // HIGH
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // LOW
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
-  Serial.println("DRIVE -> FORWARD [W]");
+  lastManualDriveTime = millis();
+  Serial.println("DRIVE -> FORWARD [W] (L_PWM=" + String(roverSpeed) + ", R_PWM=" + String(roverSpeed) + ")");
 }
 
 void moveBackward() { 
   currentDrive = DRIVE_BWD;
-  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR); 
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); 
+  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // LOW
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // HIGH
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
-  Serial.println("DRIVE -> BACKWARD [S]");
+  lastManualDriveTime = millis();
+  Serial.println("DRIVE -> BACKWARD [S] (L_PWM=" + String(roverSpeed) + ", R_PWM=" + String(roverSpeed) + ")");
 }
 
 void rotateLeft() { 
   currentDrive = DRIVE_LEFT;
-  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // LOW (Left motor fwd)
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // LOW (Right motor rev)
+  // Pivot Left: Left motor reverse (LOW), Right motor forward (LOW)
+  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // LOW (Left motor rev)
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // LOW (Right motor fwd)
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
-  Serial.println("DRIVE -> ROTATE LEFT [A]");
+  lastManualDriveTime = millis();
+  Serial.println("DRIVE -> ROTATE LEFT [A] (L_PWM=" + String(turnSpeed) + ", R_PWM=" + String(turnSpeed) + ")");
 }
 
 void rotateRight() { 
   currentDrive = DRIVE_RIGHT;
-  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // HIGH (Left motor rev)
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // HIGH (Right motor fwd)
+  // Pivot Right: Left motor forward (HIGH), Right motor reverse (HIGH)
+  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // HIGH (Left motor fwd)
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // HIGH (Right motor rev)
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
-  Serial.println("DRIVE -> ROTATE RIGHT [D]");
+  lastManualDriveTime = millis();
+  Serial.println("DRIVE -> ROTATE RIGHT [D] (L_PWM=" + String(turnSpeed) + ", R_PWM=" + String(turnSpeed) + ")");
 }
 
 void actuatorStop() { 
@@ -329,6 +344,7 @@ void stopAutoSowing() {
 
 void allActuatorsStop() { 
   stopAutoSowing();
+  stopMotors();
   actuatorStop(); 
   stopDrill(); 
   hopperCenter(); 
@@ -362,11 +378,11 @@ void processCommand(String command) {
     return;
   }
 
-  // Speed
+  // Speed configuration
   if (command.startsWith("SPEED:")) {
     int spd = command.substring(6).toInt();
-    roverSpeed = constrain(spd, 0, 255);
-    turnSpeed = constrain(spd, 80, 255);
+    roverSpeed = constrain(spd, 80, 255);
+    turnSpeed = constrain(spd, 120, 255);
     if (currentDrive == DRIVE_FWD) moveForward();
     else if (currentDrive == DRIVE_BWD) moveBackward();
     else if (currentDrive == DRIVE_LEFT) rotateLeft();
@@ -379,7 +395,18 @@ void processCommand(String command) {
   if (command == "BACKWARD") { isAutoSowing = false; moveBackward(); return; }
   if (command == "LEFT") { isAutoSowing = false; rotateLeft(); return; }
   if (command == "RIGHT") { isAutoSowing = false; rotateRight(); return; }
-  if (command == "STOP") { stopAutoSowing(); return; }
+
+  // Manual STOP command with anti-stiction hold guarantee
+  if (command == "STOP") { 
+    isAutoSowing = false;
+    uint32_t elapsed = millis() - lastManualDriveTime;
+    if (elapsed < MIN_DRIVE_PULSE_MS) {
+      delay(MIN_DRIVE_PULSE_MS - elapsed);
+    }
+    stopMotors(); 
+    return; 
+  }
+
   if (command == "ESTOP") { allActuatorsStop(); return; }
   
   // Actuator
@@ -410,6 +437,18 @@ void setup() {
   Serial.begin(115200);
   NavigatorSerial.begin(UART_BAUD, SERIAL_8N1, NAV_RX_PIN, NAV_TX_PIN);
   
+  // Configure hardware pin modes explicitly
+  pinMode(LEFT_PWM_PIN, OUTPUT);
+  pinMode(LEFT_DIR_PIN, OUTPUT); 
+  pinMode(RIGHT_PWM_PIN, OUTPUT); 
+  pinMode(RIGHT_DIR_PIN, OUTPUT);
+  pinMode(ACT_EN_PIN, OUTPUT); 
+  pinMode(ACT_IN1_PIN, OUTPUT); 
+  pinMode(ACT_IN2_PIN, OUTPUT);
+  pinMode(DRILL_EN_PIN, OUTPUT); 
+  pinMode(DRILL_IN3_PIN, OUTPUT); 
+  pinMode(DRILL_IN4_PIN, OUTPUT);
+
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
   ledcAttach(HOPPER_PIN, SERVO_PWM_HZ, SERVO_PWM_BITS);
   ledcAttach(NPK_SERVO_PIN, SERVO_PWM_HZ, SERVO_PWM_BITS);
@@ -426,15 +465,6 @@ void setup() {
   ledcAttachPin(RIGHT_PWM_PIN, RIGHT_CH);
 #endif
 
-  pinMode(LEFT_DIR_PIN, OUTPUT); 
-  pinMode(RIGHT_DIR_PIN, OUTPUT);
-  pinMode(ACT_EN_PIN, OUTPUT); 
-  pinMode(ACT_IN1_PIN, OUTPUT); 
-  pinMode(ACT_IN2_PIN, OUTPUT);
-  pinMode(DRILL_EN_PIN, OUTPUT); 
-  pinMode(DRILL_IN3_PIN, OUTPUT); 
-  pinMode(DRILL_IN4_PIN, OUTPUT);
-
   pinMode(ENCODER_LEFT_PIN, INPUT_PULLUP); 
   pinMode(ENCODER_RIGHT_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_PIN), leftEncoderISR, RISING);
@@ -447,7 +477,7 @@ void setup() {
   servoSleep();
   Serial.println("==================================================");
   Serial.println("MACHINIST READY: 1000 HZ HIGH-TORQUE MOTOR PWM");
-  Serial.println("TIME-BASED AUTO SEEDING ACTIVE");
+  Serial.println("TIME-BASED AUTO SEEDING & ANTI-STICTION ACTIVE");
   Serial.println("==================================================");
 }
 
@@ -456,11 +486,11 @@ void loop() {
   while (NavigatorSerial.available()) {
     char c = NavigatorSerial.read();
     if (c == '\n') { 
-      processCommand(rxLine); 
-      rxLine = ""; 
+      processCommand(navRxLine); 
+      navRxLine = ""; 
     } 
     else if (c != '\r') { 
-      rxLine += c; 
+      navRxLine += c; 
     }
   }
 
@@ -468,11 +498,11 @@ void loop() {
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n') { 
-      processCommand(rxLine); 
-      rxLine = ""; 
+      processCommand(serialRxLine); 
+      serialRxLine = ""; 
     } 
     else if (c != '\r') { 
-      rxLine += c; 
+      serialRxLine += c; 
     }
   }
 

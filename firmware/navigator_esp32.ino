@@ -353,6 +353,9 @@ void setupDashboard() {
         sendMachinistCommand(command);
       }
       else {
+        if (command == "FORWARD" || command == "BACKWARD" || command == "LEFT" || command == "RIGHT") {
+          autonomousEnabled = false;
+        }
         sendMachinistCommand(command); 
       }
       dashboardServer.sendHeader("Access-Control-Allow-Origin", "*");

@@ -155,7 +155,7 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     });
   };
 
-  // Direction handler
+  // Direction handler with robust touch capture
   const handleDirectionPress = useCallback(
     (dir: 'forward' | 'backward' | 'left' | 'right') => {
       playClickSound();
@@ -204,6 +204,22 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       speedKmh: prev.isRunning ? speedSetting : 0,
     }));
   }, [onUpdateEquipment, speedSetting]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>, dir: 'forward' | 'backward' | 'left' | 'right') => {
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    handleDirectionPress(dir);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {}
+    handleDirectionRelease();
+  };
 
   // Keyboard navigation support with debounce & repeat filtering
   useEffect(() => {
@@ -418,12 +434,12 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
           <button
             id="btn-dpad-up"
             aria-label="Move Forward"
-            onPointerDown={() => handleDirectionPress('forward')}
-            onPointerUp={handleDirectionRelease}
-            onPointerLeave={handleDirectionRelease}
-            className={`absolute top-2.5 left-1/2 -translate-x-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer ${
+            onPointerDown={(e) => handlePointerDown(e, 'forward')}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className={`absolute top-2.5 left-1/2 -translate-x-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-colors cursor-pointer select-none touch-none ${
               activeDirectionKey === 'forward'
-                ? 'bg-[#c1ecd4] border-[#012d1d] scale-95 ring-4 ring-[#2D6A4F]/40'
+                ? 'bg-[#c1ecd4] border-[#012d1d] ring-4 ring-[#2D6A4F]/40'
                 : 'bg-white hover:bg-gray-100'
             }`}
           >
@@ -438,12 +454,12 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
           <button
             id="btn-dpad-left"
             aria-label="Move Left"
-            onPointerDown={() => handleDirectionPress('left')}
-            onPointerUp={handleDirectionRelease}
-            onPointerLeave={handleDirectionRelease}
-            className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer ${
+            onPointerDown={(e) => handlePointerDown(e, 'left')}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-colors cursor-pointer select-none touch-none ${
               activeDirectionKey === 'left'
-                ? 'bg-[#c1ecd4] border-[#012d1d] scale-95 ring-4 ring-[#2D6A4F]/40'
+                ? 'bg-[#c1ecd4] border-[#012d1d] ring-4 ring-[#2D6A4F]/40'
                 : 'bg-white hover:bg-gray-100'
             }`}
           >
@@ -459,7 +475,7 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
             id="btn-dpad-stop"
             aria-label="Emergency Stop"
             onClick={handleEmergencyStop}
-            className="w-[110px] xs:w-[120px] h-[110px] xs:h-[120px] bg-[#DD0000] hover:bg-[#C00000] active:bg-[#990000] rounded-2xl flex flex-col items-center justify-center border-[4px] border-[#0A0A0A] shadow-lg active:scale-90 transition-all focus:outline-none focus:ring-4 focus:ring-red-400 z-10 cursor-pointer"
+            className="w-[110px] xs:w-[120px] h-[110px] xs:h-[120px] bg-[#DD0000] hover:bg-[#C00000] active:bg-[#990000] rounded-2xl flex flex-col items-center justify-center border-[4px] border-[#0A0A0A] shadow-lg active:scale-95 transition-all focus:outline-none focus:ring-4 focus:ring-red-400 z-10 cursor-pointer"
           >
             <span className="text-[24px] xs:text-[28px] font-black text-white tracking-widest uppercase font-['Public_Sans'] drop-shadow-sm">
               STOP
@@ -470,12 +486,12 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
           <button
             id="btn-dpad-right"
             aria-label="Move Right"
-            onPointerDown={() => handleDirectionPress('right')}
-            onPointerUp={handleDirectionRelease}
-            onPointerLeave={handleDirectionRelease}
-            className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer ${
+            onPointerDown={(e) => handlePointerDown(e, 'right')}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-colors cursor-pointer select-none touch-none ${
               activeDirectionKey === 'right'
-                ? 'bg-[#c1ecd4] border-[#012d1d] scale-95 ring-4 ring-[#2D6A4F]/40'
+                ? 'bg-[#c1ecd4] border-[#012d1d] ring-4 ring-[#2D6A4F]/40'
                 : 'bg-white hover:bg-gray-100'
             }`}
           >
@@ -490,12 +506,12 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
           <button
             id="btn-dpad-down"
             aria-label="Move Backward"
-            onPointerDown={() => handleDirectionPress('backward')}
-            onPointerUp={handleDirectionRelease}
-            onPointerLeave={handleDirectionRelease}
-            className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-all active:scale-95 cursor-pointer ${
+            onPointerDown={(e) => handlePointerDown(e, 'backward')}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className={`absolute bottom-2.5 left-1/2 -translate-x-1/2 w-[70px] xs:w-[76px] h-[70px] xs:h-[76px] rounded-xl border-4 border-[#0A0A0A] flex flex-col items-center justify-center shadow-xs transition-colors cursor-pointer select-none touch-none ${
               activeDirectionKey === 'backward'
-                ? 'bg-[#c1ecd4] border-[#012d1d] scale-95 ring-4 ring-[#2D6A4F]/40'
+                ? 'bg-[#c1ecd4] border-[#012d1d] ring-4 ring-[#2D6A4F]/40'
                 : 'bg-white hover:bg-gray-100'
             }`}
           >
