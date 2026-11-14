@@ -43,12 +43,13 @@
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 
-// --- MOTOR FORWARD DIRECTION CONFIGURATION ---
-const uint8_t LEFT_FWD_DIR  = HIGH; 
+// --- MOTOR FORWARD DIRECTION CONFIGURATION (Calibrated to Physical Wiring) ---
+// Left Motor Forward = LOW | Right Motor Forward = HIGH
+const uint8_t LEFT_FWD_DIR  = LOW; 
 const uint8_t RIGHT_FWD_DIR = HIGH; 
 
-const uint8_t LEFT_REV_DIR  = (LEFT_FWD_DIR == HIGH) ? LOW : HIGH;
-const uint8_t RIGHT_REV_DIR = (RIGHT_FWD_DIR == HIGH) ? LOW : HIGH;
+const uint8_t LEFT_REV_DIR  = HIGH;
+const uint8_t RIGHT_REV_DIR = LOW;
 
 // --- SAFE ESP32 PINOUT ---
 const uint8_t LEFT_PWM_PIN = 4;
@@ -208,8 +209,8 @@ void moveBackward() {
 
 void rotateLeft() { 
   currentDrive = DRIVE_LEFT;
-  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR); 
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); 
+  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // LOW (Left motor fwd)
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // LOW (Right motor rev)
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
   Serial.println("DRIVE -> ROTATE LEFT [A]");
@@ -217,8 +218,8 @@ void rotateLeft() {
 
 void rotateRight() { 
   currentDrive = DRIVE_RIGHT;
-  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR); 
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); 
+  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // HIGH (Left motor rev)
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // HIGH (Right motor fwd)
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
   Serial.println("DRIVE -> ROTATE RIGHT [D]");

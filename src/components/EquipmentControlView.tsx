@@ -170,6 +170,9 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       };
       if (cmdMap[dir]) {
         void MissionPlannerService.sendRoverCommand(cmdMap[dir]);
+        try {
+          fetch(`http://192.168.4.1/action?cmd=${cmdMap[dir]}`, { mode: 'no-cors' }).catch(() => {});
+        } catch {}
       }
 
       onUpdateEquipment((prev) => {
@@ -192,6 +195,9 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
   const handleDirectionRelease = useCallback(() => {
     setActiveDirectionKey(null);
     void MissionPlannerService.sendRoverCommand('STOP');
+    try {
+      fetch('http://192.168.4.1/action?cmd=STOP', { mode: 'no-cors' }).catch(() => {});
+    } catch {}
     onUpdateEquipment((prev) => ({
       ...prev,
       activeDirection: 'idle',
