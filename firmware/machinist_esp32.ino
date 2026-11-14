@@ -3,10 +3,10 @@
  * WITH TIME-BASED AUTONOMOUS STEP-AND-SOW DISTANCE ENGINE
  * =====================================================================================
  * MOVEMENT POLARITY (Calibrated to Physical Rover Wiring):
- *   [W] FORWARD:      Left = HIGH, Right = HIGH (Both motors drive Straight Forward)
- *   [S] BACKWARD:     Left = LOW,  Right = LOW  (Both motors drive Straight Backward)
- *   [A] ROTATE LEFT:  Left = LOW,  Right = HIGH (Left motor Rev, Right motor Fwd -> Pivots Left)
- *   [D] ROTATE RIGHT: Left = HIGH, Right = LOW  (Left motor Fwd, Right motor Rev -> Pivots Right)
+ *   [W] FORWARD:      Left = LOW,  Right = LOW  (Both motors drive Straight Forward)
+ *   [S] BACKWARD:     Left = HIGH, Right = HIGH (Both motors drive Straight Backward)
+ *   [A] ROTATE LEFT:  Left = HIGH, Right = LOW  (Left motor Rev, Right motor Fwd -> Pivots Left)
+ *   [D] ROTATE RIGHT: Left = LOW,  Right = HIGH (Left motor Fwd, Right motor Rev -> Pivots Right)
  *   [STOP]:           Cuts motor PWM to 0 immediately
  *
  * MOTOR PWM CONFIGURATION:
@@ -47,13 +47,13 @@
 #include "soc/rtc_cntl_reg.h"
 
 // --- MOTOR FORWARD DIRECTION CONFIGURATION (Calibrated to Physical Wiring) ---
-// Forward:  Left=HIGH, Right=HIGH (Drives Straight Forward)
-// Backward: Left=LOW,  Right=LOW  (Drives Straight Backward)
-const uint8_t LEFT_FWD_DIR  = HIGH; 
-const uint8_t RIGHT_FWD_DIR = HIGH; 
+// Forward:  Left=LOW,  Right=LOW  (Drives Straight Forward)
+// Backward: Left=HIGH, Right=HIGH (Drives Straight Backward)
+const uint8_t LEFT_FWD_DIR  = LOW; 
+const uint8_t RIGHT_FWD_DIR = LOW; 
 
-const uint8_t LEFT_REV_DIR  = LOW;
-const uint8_t RIGHT_REV_DIR = LOW;
+const uint8_t LEFT_REV_DIR  = HIGH;
+const uint8_t RIGHT_REV_DIR = HIGH;
 
 // --- SAFE ESP32 PINOUT ---
 const uint8_t LEFT_PWM_PIN  = 4;
@@ -207,8 +207,8 @@ void stopMotors() {
 
 void moveForward() { 
   currentDrive = DRIVE_FWD;
-  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // HIGH
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // HIGH
+  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // LOW
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // LOW
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
   lastManualDriveTime = millis();
@@ -217,8 +217,8 @@ void moveForward() {
 
 void moveBackward() { 
   currentDrive = DRIVE_BWD;
-  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // LOW
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // LOW
+  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // HIGH
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // HIGH
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, roverSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, roverSpeed); 
   lastManualDriveTime = millis();
@@ -227,9 +227,9 @@ void moveBackward() {
 
 void rotateLeft() { 
   currentDrive = DRIVE_LEFT;
-  // Pivot Left: Left motor reverse (LOW), Right motor forward (HIGH)
-  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // LOW (Left motor rev)
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // HIGH (Right motor fwd)
+  // Pivot Left: Left motor reverse (HIGH), Right motor forward (LOW)
+  digitalWrite(LEFT_DIR_PIN, LEFT_REV_DIR);   // HIGH
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_FWD_DIR); // LOW
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
   lastManualDriveTime = millis();
@@ -238,9 +238,9 @@ void rotateLeft() {
 
 void rotateRight() { 
   currentDrive = DRIVE_RIGHT;
-  // Pivot Right: Left motor forward (HIGH), Right motor reverse (LOW)
-  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // HIGH (Left motor fwd)
-  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // LOW (Right motor rev)
+  // Pivot Right: Left motor forward (LOW), Right motor reverse (HIGH)
+  digitalWrite(LEFT_DIR_PIN, LEFT_FWD_DIR);   // LOW
+  digitalWrite(RIGHT_DIR_PIN, RIGHT_REV_DIR); // HIGH
   writeMotorPwm(LEFT_PWM_PIN, LEFT_CH, turnSpeed); 
   writeMotorPwm(RIGHT_PWM_PIN, RIGHT_CH, turnSpeed); 
   lastManualDriveTime = millis();
