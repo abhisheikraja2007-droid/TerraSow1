@@ -1,5 +1,6 @@
 /* =====================================================================================
- * MACHINIST ESP32 - PRECISION TIME-BASED AUTONOMOUS STEP-AND-SOW CONTROLLER
+ * MACHINIST ESP32 - PRECISION CALIBRATED MOVEMENT & HIGH-SPEED SERVO CONTROLLER
+ * WITH TIME-BASED AUTONOMOUS STEP-AND-SOW DISTANCE ENGINE
  * =====================================================================================
  */
 
@@ -14,7 +15,7 @@ const uint8_t RIGHT_FWD_DIR = HIGH;
 const uint8_t LEFT_REV_DIR  = (LEFT_FWD_DIR == HIGH) ? LOW : HIGH;
 const uint8_t RIGHT_REV_DIR = (RIGHT_FWD_DIR == HIGH) ? LOW : HIGH;
 
-// --- PINOUT ---
+// --- SAFE ESP32 PINOUT ---
 const uint8_t LEFT_PWM_PIN = 4;
 const uint8_t LEFT_DIR_PIN = 5;
 const uint8_t RIGHT_PWM_PIN = 18; 
@@ -38,7 +39,9 @@ const uint8_t ENCODER_LEFT_PIN = 21;
 const uint8_t ENCODER_RIGHT_PIN = 22; 
 
 const uint32_t UART_BAUD = 115200;
-const uint32_t MOTOR_PWM_HZ = 20000; 
+
+// 1 kHz PWM frequency delivers maximum motor torque with no driver buzz
+const uint32_t MOTOR_PWM_HZ = 1000; 
 const uint8_t MOTOR_PWM_BITS = 8;
 
 const uint32_t SERVO_PWM_HZ = 50;
@@ -383,7 +386,8 @@ void setup() {
   
   allActuatorsStop();
   Serial.println("==================================================");
-  Serial.println("MACHINIST READY: TIME-BASED AUTO SEEDING ACTIVE");
+  Serial.println("MACHINIST READY: 1000 HZ HIGH-TORQUE MOTOR PWM");
+  Serial.println("TIME-BASED AUTO SEEDING ACTIVE");
   Serial.println("==================================================");
 }
 
