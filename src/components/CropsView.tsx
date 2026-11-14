@@ -110,9 +110,12 @@ export const CropsView: React.FC<CropsViewProps> = ({
   const handleApplyActiveProfile = (crop: CropProfile) => {
     playBeepSound(700, 0.15);
     onSelectCrop(crop);
+    const spacing = parseSpacingNumber(crop.seedSpacing);
     onUpdateEquipment((prev) => ({
       ...prev,
       activeCropId: crop.id,
+      targetSpacingCm: spacing,
+      actualSpacingCm: spacing,
     }));
     setActiveProfileApplied(true);
     setTimeout(() => setActiveProfileApplied(false), 2500);

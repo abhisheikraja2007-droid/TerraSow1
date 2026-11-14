@@ -2,6 +2,41 @@
  * MACHINIST ESP32 - PRECISION CALIBRATED MOVEMENT & HIGH-SPEED SERVO CONTROLLER
  * WITH TIME-BASED AUTONOMOUS STEP-AND-SOW DISTANCE ENGINE
  * =====================================================================================
+ * MOVEMENT MAPPING:
+ *   [W] FORWARD:  Both Left & Right wheels drive Forward together (Straight)
+ *   [S] BACKWARD: Both Left & Right wheels drive Reverse together (Straight)
+ *   [A] LEFT:     Left wheel reverses, Right wheel drives forward (Pivots Left)
+ *   [D] RIGHT:    Left wheel drives forward, Right wheel reverses (Pivots Right)
+ *   [STOP]:       Cuts motor PWM to 0 immediately
+ *
+ * MOTOR PWM FREQUENCY:
+ *   Set to 1000 Hz (1 kHz) for maximum starting torque and zero driver buzzing/whine.
+ *
+ * TIME-BASED AUTONOMOUS STEP-AND-SOW:
+ *   - Completely independent of encoders and GPS: works indoors, in mud, anywhere!
+ *   - 1 cm = 45 ms drive time at roverSpeed (255)
+ *     Wheat (18 cm)   = 810 ms drive -> stop & settle -> drop seed -> center -> repeat
+ *     Maize (25 cm)   = 1125 ms drive -> stop & settle -> drop seed -> center -> repeat
+ *     Paddy (12.5 cm) = 562 ms drive -> stop & settle -> drop seed -> center -> repeat
+ * =====================================================================================
+ * PINOUT ASSIGNMENTS:
+ *   Left Motor PWM:    Pin 4
+ *   Left Motor DIR:    Pin 5
+ *   Right Motor PWM:   Pin 18
+ *   Right Motor DIR:   Pin 19
+ *   Actuator Enable:   Pin 23
+ *   Actuator IN1:      Pin 25
+ *   Actuator IN2:      Pin 26
+ *   Drill Enable:      Pin 27
+ *   Drill IN3:         Pin 32
+ *   Drill IN4:         Pin 33
+ *   Hopper Servo PWM:  Pin 14
+ *   NPK Servo PWM:     Pin 13
+ *   Navigator UART RX: Pin 16 <--- Connect to Navigator TX (Pin 25)
+ *   Navigator UART TX: Pin 17 ---> Connect to Navigator RX (Pin 26)
+ *   Left Encoder:      Pin 21
+ *   Right Encoder:     Pin 22
+ * =====================================================================================
  */
 
 #include <Arduino.h>
@@ -293,7 +328,7 @@ void processCommand(String command) {
 
   // Autonomous Seeding Triggers
   if (command == "AUTO_START" || command == "AUTO:START") {
-    startAutoSowing(18);
+    startAutoSowing(targetSpacingCm > 0 ? targetSpacingCm : 18);
     return;
   }
   if (command.startsWith("SEED_RUN:")) {
@@ -431,11 +466,11 @@ void loop() {
       }
     }
     else if (autoSowState == SOW_STOP_SETTLE) {
-      if (elapsed >= 100) {
+      if (elapsed >= 100) { // 100ms motor inertia settle
         if (!alternateSide) {
-          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_LEFT_ANGLE);
+          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_LEFT_ANGLE); // +45° Left
         } else {
-          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_RIGHT_ANGLE);
+          writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_RIGHT_ANGLE); // -45° Right
         }
         alternateSide = !alternateSide;
         autoSowState = SOW_DISPENSE;
@@ -444,14 +479,14 @@ void loop() {
       }
     }
     else if (autoSowState == SOW_DISPENSE) {
-      if (elapsed >= 130) {
-        writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_CENTER_ANGLE);
+      if (elapsed >= 130) { // 130ms gate open time
+        writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_CENTER_ANGLE); // Return to 0° Center
         autoSowState = SOW_RETURN_CENTER;
         sowStateStartTime = millis();
       }
     }
     else if (autoSowState == SOW_RETURN_CENTER) {
-      if (elapsed >= 100) {
+      if (elapsed >= 100) { // 100ms return settle time
         seedCount++;
         autoSowState = SOW_MOVE;
         sowStateStartTime = millis();

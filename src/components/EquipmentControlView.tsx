@@ -119,9 +119,23 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
     await MissionPlannerService.sendRoverCommand(`SPEED:${clamped}`);
   };
 
-  // Keep spacing setting in sync with equipmentState
+  // Keep spacing setting in sync with equipmentState and selected crop
   useEffect(() => {
-    if (equipmentState.targetSpacingCm) {
+    if (selectedCrop) {
+      const cropSpacing = getCropDefaultSpacing(selectedCrop);
+      const target = equipmentState.targetSpacingCm || cropSpacing;
+      setSpacingSetting(target);
+      onUpdateEquipment((prev) => ({
+        ...prev,
+        targetSpacingCm: target,
+        actualSpacingCm: target,
+        activeCropId: selectedCrop.id,
+      }));
+    }
+  }, [selectedCrop.id]);
+
+  useEffect(() => {
+    if (equipmentState.targetSpacingCm && equipmentState.targetSpacingCm !== spacingSetting) {
       setSpacingSetting(equipmentState.targetSpacingCm);
     }
   }, [equipmentState.targetSpacingCm]);
@@ -289,7 +303,11 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       void MissionPlannerService.setArmed(true);
       void MissionPlannerService.setMode('AUTO');
       // Transmit the exact crop distance to the ESP32!
-      void MissionPlannerService.sendRoverCommand(`SEED_RUN:${Math.round(spacingSetting)}`);
+      const targetCm = Math.round(spacingSetting);
+      void MissionPlannerService.sendRoverCommand(`SEED_RUN:${targetCm}`);
+      try {
+        fetch(`http://192.168.4.1/action?cmd=SEED_RUN:${targetCm}`, { mode: 'no-cors' }).catch(() => {});
+      } catch {}
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: true,
@@ -302,6 +320,10 @@ export const EquipmentControlView: React.FC<EquipmentControlViewProps> = ({
       void MissionPlannerService.setMode('MANUAL');
       void MissionPlannerService.sendRoverCommand('SEED_STOP');
       void MissionPlannerService.sendRoverCommand('STOP');
+      try {
+        fetch('http://192.168.4.1/action?cmd=SEED_STOP', { mode: 'no-cors' }).catch(() => {});
+        fetch('http://192.168.4.1/action?cmd=STOP', { mode: 'no-cors' }).catch(() => {});
+      } catch {}
       onUpdateEquipment((prev) => ({
         ...prev,
         isRunning: false,
