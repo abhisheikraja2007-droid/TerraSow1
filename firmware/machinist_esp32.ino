@@ -139,6 +139,17 @@ void writeServoAngle(uint8_t pin, uint8_t channel, int angle) {
 #endif
 }
 
+void servoSleep() {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+  ledcWrite(HOPPER_PIN, 0);
+  ledcWrite(NPK_SERVO_PIN, 0);
+#else
+  ledcWrite(HOPPER_CH, 0);
+  ledcWrite(NPK_CH, 0);
+#endif
+  Serial.println("HARDWARE -> Servos in Silent Sleep (0% Duty)");
+}
+
 void writeMotorPwm(uint8_t pin, uint8_t channel, uint8_t duty) {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
   ledcWrite(pin, duty);
@@ -419,7 +430,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_LEFT_PIN), leftEncoderISR, RISING);
   attachInterrupt(digitalPinToInterrupt(ENCODER_RIGHT_PIN), rightEncoderISR, RISING);
   
-  allActuatorsStop();
+  // Safe initial state on power up: all outputs OFF, servos completely asleep (0 duty)
+  stopMotors();
+  actuatorStop();
+  stopDrill();
+  servoSleep();
   Serial.println("==================================================");
   Serial.println("MACHINIST READY: 1000 HZ HIGH-TORQUE MOTOR PWM");
   Serial.println("TIME-BASED AUTO SEEDING ACTIVE");
