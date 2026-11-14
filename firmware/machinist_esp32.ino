@@ -44,12 +44,13 @@
 #include "soc/rtc_cntl_reg.h"
 
 // --- MOTOR FORWARD DIRECTION CONFIGURATION (Calibrated to Physical Wiring) ---
-// Left Motor Forward = LOW | Right Motor Forward = HIGH
-const uint8_t LEFT_FWD_DIR  = LOW; 
-const uint8_t RIGHT_FWD_DIR = HIGH; 
+// Forward:  Left=HIGH, Right=LOW (Drives Straight Forward)
+// Backward: Left=LOW,  Right=HIGH (Drives Straight Backward)
+const uint8_t LEFT_FWD_DIR  = HIGH; 
+const uint8_t RIGHT_FWD_DIR = LOW; 
 
-const uint8_t LEFT_REV_DIR  = HIGH;
-const uint8_t RIGHT_REV_DIR = LOW;
+const uint8_t LEFT_REV_DIR  = LOW;
+const uint8_t RIGHT_REV_DIR = HIGH;
 
 // --- SAFE ESP32 PINOUT ---
 const uint8_t LEFT_PWM_PIN = 4;
@@ -101,15 +102,21 @@ uint32_t lastSeedStep = 0;
 uint8_t multiSeedState = 0; 
 const uint32_t SEED_STEP_DELAY = 120; 
 
-// --- TIME-BASED CALIBRATION: 1 cm = 45 ms at full motor speed ---
-const uint32_t DRIVE_MS_PER_CM = 45; 
+// --- TIME-BASED CALIBRATION & AUTONOMOUS AGRI-CYCLE TIMINGS ---
+const uint32_t DRIVE_MS_PER_CM       = 45;   // 1 cm drive time at full speed
+const uint32_t SETTLE_TIME_MS        = 100;  // Inertia settle time
+const uint32_t ACTUATOR_DOWN_TIME_MS = 1000; // Actuator extends drill down into soil
+const uint32_t ACTUATOR_UP_TIME_MS   = 1000; // Actuator retracts drill back up out of soil
+const uint32_t SEED_DISPENSE_TIME_MS = 140;  // Hopper servo gate open time
 
 enum AutoSowState {
   SOW_IDLE,
-  SOW_MOVE,
-  SOW_STOP_SETTLE,
-  SOW_DISPENSE,
-  SOW_RETURN_CENTER
+  SOW_MOVE,          // 1. Driving forward to next seed spot
+  SOW_STOP_SETTLE,   // 2. Wheels stopped, settle before drilling
+  SOW_DRILL_DOWN,    // 3. Drill ON + Actuator DOWN (digging seed hole)
+  SOW_DRILL_UP,      // 4. Actuator UP (retracting from hole), then Drill OFF
+  SOW_DISPENSE,      // 5. Open Hopper servo (Left / Right) into hole
+  SOW_RETURN_CENTER  // 6. Close Hopper servo to Center
 };
 
 AutoSowState autoSowState = SOW_IDLE;
@@ -314,6 +321,8 @@ void stopAutoSowing() {
   isAutoSowing = false;
   autoSowState = SOW_IDLE;
   stopMotors();
+  stopDrill();
+  actuatorStop();
   hopperCenter();
   Serial.println("AUTOSOW -> STOPPED. Total seeds sown: " + String(seedCount));
 }
@@ -467,7 +476,7 @@ void loop() {
     }
   }
 
-  // 3. PURE TIME-BASED AUTONOMOUS STEP-AND-SOW
+  // 3. PURE TIME-BASED AUTONOMOUS STEP-AND-SOW (WITH DRILL & ACTUATOR)
   if (isAutoSowing) {
     uint32_t elapsed = millis() - sowStateStartTime;
     uint32_t targetDriveTimeMs = (uint32_t)targetSpacingCm * DRIVE_MS_PER_CM;
@@ -482,7 +491,27 @@ void loop() {
       }
     }
     else if (autoSowState == SOW_STOP_SETTLE) {
-      if (elapsed >= 100) { // 100ms motor inertia settle
+      if (elapsed >= SETTLE_TIME_MS) {
+        startDrill();      // Start drilling motor
+        actuatorExtend();  // Lower actuator into soil
+        autoSowState = SOW_DRILL_DOWN;
+        sowStateStartTime = millis();
+        Serial.println("AUTOSOW -> Drill ON, Actuator Extending DOWN...");
+      }
+    }
+    else if (autoSowState == SOW_DRILL_DOWN) {
+      if (elapsed >= ACTUATOR_DOWN_TIME_MS) {
+        actuatorRetract(); // Pull drill back up out of soil
+        autoSowState = SOW_DRILL_UP;
+        sowStateStartTime = millis();
+        Serial.println("AUTOSOW -> Hole Drilled! Actuator Retracting UP...");
+      }
+    }
+    else if (autoSowState == SOW_DRILL_UP) {
+      if (elapsed >= ACTUATOR_UP_TIME_MS) {
+        actuatorStop();    // Stop linear actuator
+        stopDrill();       // Stop drill motor
+        // Dispense seed into the freshly drilled hole
         if (!alternateSide) {
           writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_LEFT_ANGLE); // +45° Left
         } else {
@@ -495,14 +524,14 @@ void loop() {
       }
     }
     else if (autoSowState == SOW_DISPENSE) {
-      if (elapsed >= 130) { // 130ms gate open time
+      if (elapsed >= SEED_DISPENSE_TIME_MS) {
         writeServoAngle(HOPPER_PIN, HOPPER_CH, HOPPER_CENTER_ANGLE); // Return to 0° Center
         autoSowState = SOW_RETURN_CENTER;
         sowStateStartTime = millis();
       }
     }
     else if (autoSowState == SOW_RETURN_CENTER) {
-      if (elapsed >= 100) { // 100ms return settle time
+      if (elapsed >= SETTLE_TIME_MS) {
         seedCount++;
         autoSowState = SOW_MOVE;
         sowStateStartTime = millis();
